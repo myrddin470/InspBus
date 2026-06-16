@@ -1115,23 +1115,24 @@ function centrarMapaDesdeURL() {
     const paramLng = urlParams.get('lng');
 
     if (paramLat && paramLng) {
-        const lat = parseFloat(paramLat);
-        const lng = parseFloat(paramLng);
+        const targetLat = parseFloat(paramLat);
+        const targetLng = parseFloat(paramLng);
 
-        // Hacemos que el mapa vuele a esa posición con zoom alto
-        map.setView([lat, lng], 19);
+        // 1. Centramos el mapa en las coordenadas recibidas con zoom de detalle (19)
+        map.setView([targetLat, targetLng], 19);
 
-        // Creamos una chincheta amarilla gigante y destacada
-        const iconDestacado = L.divIcon({
-            html: `<svg width="48" height="48" viewBox="0 0 24 24" fill="#eab308" stroke="black" stroke-width="2"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"></path><circle cx="12" cy="10" r="3" fill="black"></circle></svg>`,
-            className: 'custom-pin', iconSize: [48, 48], iconAnchor: [24, 48]
-        });
-
-        // La añadimos al mapa y le ponemos un mensaje
-        L.marker([lat, lng], {icon: iconDestacado, zIndexOffset: 2000})
-            .addTo(map)
-            .bindPopup("<b style='font-size:14px;'>📍 Punto seleccionado desde el PDF</b>")
-            .openPopup();
+        // 2. Buscamos entre tus marcadores existentes para abrir su popup
+        // (Esto asume que tienes tus marcadores guardados en una capa llamada 'capaMarcadores' o similar)
+        // Si usas una capa de Leaflet, hacemos esto:
+        if (typeof capaMarcadores !== 'undefined') {
+            capaMarcadores.eachLayer(function (layer) {
+                const pos = layer.getLatLng();
+                // Comparamos con una pequeña tolerancia (0.00001) para encontrar el punto exacto
+                if (Math.abs(pos.lat - targetLat) < 0.00001 && Math.abs(pos.lng - targetLng) < 0.00001) {
+                    layer.openPopup(); // Abre el popup del punto existente
+                }
+            });
+        }
     }
 }
 
