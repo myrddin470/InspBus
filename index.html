@@ -1056,7 +1056,7 @@ function moverChinchetaYDireccion(lat, lng) {
         doc.text("INFORME GENERAL DE UBICACIONES E INSPECCIONES", 148.5, 12, { align: "center" });
 
         // --- PREPARACIÓN DE DATOS ---
-        const baseUrl = 'file:///C:/Users/JCOS.../Desktop/index4.html'; 
+        const baseUrl = 'https://myrddin470.github.io/InspBus/index.html'; 
 
         const tablaBody = Object.values(dbData).map(item => {
             const url = (item.geoLat && item.geoLng) ? `${baseUrl}?lat=${item.geoLat}&lng=${item.geoLng}` : null;
