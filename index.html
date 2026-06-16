@@ -272,6 +272,81 @@
             .modal-container { height: 95vh; }
         }
     </style>
+<script type="module">
+  import { initializeApp } from "https://www.gstatic.com/firebasejs/9.22.0/firebase-app.js";
+  import { getAuth, signInWithEmailAndPassword, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/9.22.0/firebase-auth.js";
+  import { getDatabase, ref, onValue, set, remove } from "https://www.gstatic.com/firebasejs/9.22.0/firebase-database.js";
+
+  const firebaseConfig = {
+    apiKey: "AIzaSyBatYG7fgtozpxnI3UhI35NPLizXpAIhhw",
+    authDomain: "calescolar-4d347.firebaseapp.com",
+    databaseURL: "https://calescolar-4d347-default-rtdb.europe-west1.firebasedatabase.app",
+    projectId: "calescolar-4d347",
+    storageBucket: "calescolar-4d347.firebasestorage.app",
+    messagingSenderId: "645908876195",
+    appId: "1:645908876195:web:a47eef335ab616e41fa816"
+  };
+
+  const app = initializeApp(firebaseConfig);
+  window.auth = getAuth(app);
+  window.db = getDatabase(app);
+
+  // Compartir funciones del SDK con el script general
+  window.ref = ref;
+  window.onValue = onValue;
+  window.set = set;
+  window.remove = remove;
+
+  // Función de carga de datos segura
+  window.cargarDatosFirebase = function() {
+      const dbRef = window.ref(window.db, 'inspecciones_transporte');
+      window.onValue(dbRef, (snapshot) => {
+          window.dbData = snapshot.val() || {};
+          console.log("Datos cargados correctamente desde la nube.");
+          if (typeof window.renderizarPuntosExistentes === 'function') {
+              window.renderizarPuntosExistentes();
+          }
+      });
+  };
+
+  // Función de guardado integrada
+  window.guardarDatosFirebase = function(idElemento, nuevosDatos) {
+      const dbRef = window.ref(window.db, 'inspecciones_transporte/' + idElemento);
+      window.set(dbRef, nuevosDatos)
+          .then(() => console.log("Guardado exitoso en Firebase."))
+          .catch((error) => console.error("Error al guardar en Firebase:", error));
+  };
+
+  // CONTROL DE SESIÓN CENTRALIZADO (Maneja la visibilidad de la pantalla aquí directamente)
+  onAuthStateChanged(window.auth, (user) => {
+      const modal = document.getElementById('login-modal');
+      if (user) {
+          console.log("Sesión activa detectada para:", user.email);
+          window.cargarDatosFirebase();
+          
+          // Oculta el login directamente por ID para evitar fallos entre scripts
+          if (modal) modal.style.display = 'none';
+      } else {
+          console.log("No hay sesión activa. Bloqueando pantalla con Login.");
+          if (modal) modal.style.display = 'flex';
+      }
+  });
+
+  // Ejecución del botón del formulario
+  window.login = function(email, password) {
+      signInWithEmailAndPassword(window.auth, email, password)
+          .then((userCredential) => {
+              console.log("Inicio de sesión manual correcto:", userCredential.user.email);
+              // No hace falta ocultar el modal aquí; 'onAuthStateChanged' lo detectará arriba y lo cerrará solo.
+          })
+          .catch((error) => {
+              console.error("Error de autenticación:", error.code);
+              alert("Error al acceder: " + error.message);
+          });
+  };
+</script>
+
+
 </head>
 <body>
 
@@ -279,9 +354,9 @@
 
     <div id="sidebar">
         <div class="sidebar-header">
-            <h1>Inspección de Transportes de León</h1>
-            <div class="subtitle-1">Servicio Territorial de Movilidad, Transformación Digital e IA </div>
-            <div class="subtitle-2">Control de Marquesinas y Tótems. BUSCYL</div>
+            <h1>Control de Marquesinas y Tótems</h1>
+            <div class="subtitle-1">LEÓN - BUSCYL </div>
+            
             <button class="close-sidebar-btn" onclick="toggleSidebar()">✕</button>
         </div>
         <div class="sidebar-content">
@@ -394,12 +469,19 @@
         let marcadorTemporalEdicion = null;
         const imgSat = "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/10/374/180.png";
 
-        window.addEventListener('DOMContentLoaded', () => {
-            initMap();
-            cargarDatosLocales();
-            configurarAvisoSalida();
-            document.getElementById('map-switch').style.backgroundImage = `url('${imgSat}')`;
-        });
+      window.addEventListener('DOMContentLoaded', () => {
+    // 1. Iniciamos el mapa siempre
+    initMap();
+    
+    // 2. Quitamos 'cargarDatosFirebase()' de aquí. 
+    // Ahora lo hará automáticamente el 'onAuthStateChanged' que pusimos en el módulo.
+    
+    configurarAvisoSalida();
+    document.getElementById('map-switch').style.backgroundImage = `url('${imgSat}')`;
+    
+    // Opcional: Aseguramos que el login esté oculto al iniciar por si acaso
+    // ocultarFormularioLogin(); 
+});
 
         function toggleSidebar() { document.getElementById('sidebar').classList.toggle('open'); }
 
@@ -554,27 +636,50 @@ function moverChinchetaYDireccion(lat, lng) {
     });
 }
 
-        function cargarDatosLocales() { const data = localStorage.getItem('inspecciones_transporte'); if (data) { dbData = JSON.parse(data); renderizarPuntosExistentes(); } }
-        function guardarDatosLocales() { localStorage.setItem('inspecciones_transporte', JSON.stringify(dbData)); renderizarPuntosExistentes(); }
+       // Referencia a la base de datos
+const dbRef = ref(window.db, 'inspecciones_transporte');
 
-        function renderizarPuntosExistentes() {
-            marcadoresGrupo.forEach(m => map.removeLayer(m)); marcadoresGrupo = [];
-            const verM = document.getElementById('filtroMarquesinas').checked;
-            const verT = document.getElementById('filtroTotems').checked;
-            Object.keys(dbData).forEach(id => {
-                const item = dbData[id];
-                if (item.elemTipo === 'MARQUESINA' && !verM) return;
-                if (item.elemTipo === 'TOTEM' && !verT) return;
-                const col = item.elemTipo === 'MARQUESINA' ? '#2563eb' : '#f59e0b';
-                const icon = L.divIcon({
-                    html: `<svg width="32" height="32" viewBox="0 0 24 24" fill="${col}" stroke="white" stroke-width="2"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"></path><circle cx="12" cy="10" r="3" fill="white"></circle></svg>`,
-                    className: 'custom-pin', iconSize: [32, 32], iconAnchor: [16, 32]
-                });
-                const m = L.marker([item.geoLat, item.geoLng], { icon }).addTo(map);
-                m.on('click', (e) => { L.DomEvent.stopPropagation(e); abrirFormularioEditar(id); });
-                marcadoresGrupo.push(m);
-            });
-        }
+
+function renderizarPuntosExistentes() {
+    // 1. SINCRONIZACIÓN: Traemos los datos actualizados de Firebase a la variable local
+    if (window.dbData) {
+        dbData = window.dbData;
+    }
+
+    // 2. Limpieza de marcadores anteriores
+    marcadoresGrupo.forEach(m => map.removeLayer(m)); 
+    marcadoresGrupo = [];
+    
+    // 3. Captura de filtros del HTML
+    const verM = document.getElementById('filtroMarquesinas').checked;
+    const verT = document.getElementById('filtroTotems').checked;
+
+    // 4. Dibujado de los puntos reales sincronizados
+    Object.keys(dbData).forEach(id => {
+        const item = dbData[id];
+        
+        // Evitamos errores si algún nodo viene vacío o incompleto de Firebase
+        if (!item || !item.geoLat || !item.geoLng) return; 
+
+        if (item.elemTipo === 'MARQUESINA' && !verM) return;
+        if (item.elemTipo === 'TOTEM' && !verT) return;
+        
+        const col = item.elemTipo === 'MARQUESINA' ? '#2563eb' : '#f59e0b';
+        const icon = L.divIcon({
+            html: `<svg width="32" height="32" viewBox="0 0 24 24" fill="${col}" stroke="white" stroke-width="2"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"></path><circle cx="12" cy="10" r="3" fill="white"></circle></svg>`,
+            className: 'custom-pin', 
+            iconSize: [32, 32], 
+            iconAnchor: [16, 32]
+        });
+        
+        const m = L.marker([item.geoLat, item.geoLng], { icon }).addTo(map);
+        m.on('click', (e) => { 
+            L.DomEvent.stopPropagation(e); 
+            abrirFormularioEditar(id); 
+        });
+        marcadoresGrupo.push(m);
+    });
+}
 
         function abrirFormularioNuevo(lat, lng) {
             const id = 'id_' + new Date().getTime();
@@ -752,20 +857,123 @@ function moverChinchetaYDireccion(lat, lng) {
         function renderRowContrastado(label, name) { return `<div class="row-inspect"><span>${label}</span><div class="radio-tile-group"><label class="radio-tile"><input type="radio" name="${name}" value="OK" class="ok-check"><span>Correcto</span></label><label class="radio-tile"><input type="radio" name="${name}" value="DEFECTO" class="def-check"><span>Incorr.</span></label></div><input type="text" id="${name}_det" placeholder="Detalle" class="form-control" style="padding:5px; font-size:12px;"></div>`; }
 
         function guardarFormulario() {
-            const id = document.getElementById('elemId').value; const form = document.getElementById('inspectionForm');
-            let obj = { elemId: id, elemTipo: document.getElementById('elemTipo').value, geoLat: parseFloat(document.getElementById('geoLat').value), geoLng: parseFloat(document.getElementById('geoLng').value), utmX: document.getElementById('utmX').value, utmY: document.getElementById('utmY').value };
-            Array.from(form.elements).forEach(el => {
-                if (el.id && !['elemId','elemTipo','geoLat','geoLng','utmX','utmY'].includes(el.id)) obj[el.id] = el.type === 'checkbox' ? el.checked : el.value;
-                if (el.type === 'radio' && el.checked) obj[el.name] = el.value;
-            });
-            dbData[id] = obj; guardarDatosLocales(); cerrarModal();
-        }
+    const id = document.getElementById('elemId').value; 
+    const form = document.getElementById('inspectionForm');
+    
+    let obj = { 
+        elemId: id, 
+        elemTipo: document.getElementById('elemTipo').value, 
+        geoLat: parseFloat(document.getElementById('geoLat').value), 
+        geoLng: parseFloat(document.getElementById('geoLng').value), 
+        utmX: document.getElementById('utmX').value, 
+        utmY: document.getElementById('utmY').value 
+    };
 
-        function borrarPunto() { const id = document.getElementById('elemId').value; if(confirm("¿Eliminar?")) { delete dbData[id]; guardarDatosLocales(); cerrarModal(); } }
-        function exportarJSON() { const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(dbData, null, 2)); const a = document.createElement('a'); a.setAttribute("href", dataStr); a.setAttribute("download", `Inspecciones.json`); document.body.appendChild(a); a.click(); a.remove(); }
-        function importarJSON() { document.getElementById('importFile').click(); }
-        function procesarImportacion(ev) { const f = ev.target.files[0]; if (!f) return; const r = new FileReader(); r.onload = function(e) { try { dbData = { ...dbData, ...JSON.parse(e.target.result) }; guardarDatosLocales(); alert("¡Datos combinados!"); } catch (e) { alert("Archivo inválido."); } }; r.readAsText(f); }
-        function configurarAvisoSalida() { window.addEventListener('beforeunload', (e) => { e.preventDefault(); e.returnValue = ''; }); }
+    Array.from(form.elements).forEach(el => {
+        if (el.id && !['elemId','elemTipo','geoLat','geoLng','utmX','utmY'].includes(el.id)) {
+            obj[el.id] = el.type === 'checkbox' ? el.checked : el.value;
+        }
+        if (el.type === 'radio' && el.checked) {
+            obj[el.name] = el.value;
+        }
+    });
+
+    // 1. Actualizamos tu variable local para que el mapa se pinte al instante
+    dbData[id] = obj; 
+    
+    // 2. Llamamos a la función de Firebase con las variables correctas
+    // Pasamos el 'id' (que es el ID del elemento) y el 'obj' (que son los datos)
+    window.guardarDatosFirebase(id, obj); 
+    
+    // 3. Cerramos el modal
+    cerrarModal();
+}
+function borrarPunto() { 
+    const id = document.getElementById('elemId').value; 
+    
+    if(confirm("¿Estás seguro de que quieres eliminar este elemento?")) {
+        // 1. Eliminamos de Firebase usando la nueva función que definimos
+        // Pasamos el ID y la función remove hará el trabajo sucio en la nube
+        const elementoRef = window.ref(window.db, 'inspecciones_transporte/' + id);
+        window.remove(elementoRef)
+            .then(() => {
+                console.log("Elemento eliminado de la nube correctamente");
+                
+                // 2. Eliminamos de nuestra variable local
+                delete dbData[id];
+                
+                // 3. Refrescamos el mapa y cerramos el modal
+                renderizarPuntosExistentes();
+                cerrarModal();
+            })
+            .catch((error) => {
+                console.error("Error al eliminar de Firebase:", error);
+                alert("Hubo un error al intentar eliminar el registro.");
+            });
+    } 
+}
+        
+       function exportarJSON() {
+    // Nos aseguramos de leer la variable global que actualiza Firebase
+    if (!window.dbData || Object.keys(window.dbData).length === 0) {
+        alert("No hay datos cargados desde Firebase para exportar.");
+        return;
+    }
+    
+    const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(window.dbData, null, 2));
+    const a = document.createElement('a');
+    a.setAttribute("href", dataStr);
+    a.setAttribute("download", `Inspecciones.json`);
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+}
+
+function importarJSON() {
+    document.getElementById('importFile').click();
+}
+
+function procesarImportacion(ev) {
+    const f = ev.target.files[0];
+    if (!f) return;
+    
+    const r = new FileReader();
+    r.onload = function(e) {
+        try {
+            const datosDelArchivo = JSON.parse(e.target.result);
+            
+            // Leemos lo que tiene Firebase actualmente en la ventana global
+            const datosActualesEnNube = window.dbData || {};
+            
+            // Combinamos de forma segura ambos objetos
+            const datosCombinados = { ...datosActualesEnNube, ...datosDelArchivo };
+
+            const dbRef = window.ref(window.db, 'inspecciones_transporte');
+            
+            // Subimos el bloque completo combinado a Firebase
+            window.set(dbRef, datosCombinados)
+                .then(() => {
+                    alert("¡Datos combinados e importados a Firebase con éxito!");
+                    ev.target.value = ''; // Limpiamos el input
+                })
+                .catch((error) => {
+                    console.error("Error al subir la importación:", error);
+                    alert("No se pudieron guardar los datos en la nube.");
+                });
+
+        } catch (err) {
+            alert("Archivo inválido o corrupto.");
+        }
+    };
+    r.readAsText(f);
+}
+
+function configurarAvisoSalida() {
+    // Como Firebase guarda los cambios en tiempo real cada vez que das a "Guardar" o "Borrar",
+    // este aviso ya no es tan crítico para no perder datos, pero lo mantenemos por seguridad 
+    // por si cierras la pestaña a mitad de rellenar un formulario.
+   
+}
 
         // ==========================================
         //  NUEVA LÓGICA: GENERADOR DE XML CONSOLIDADO
@@ -920,11 +1128,11 @@ function moverChinchetaYDireccion(lat, lng) {
         doc.setTextColor(255, 255, 255);
         doc.setFont("helvetica", "bold");
         doc.setFontSize(16);
-        doc.text("ACTA TÉCNICA DE INSPECCIÓN", 105, 12, { align: "center" });
+        doc.text("INFORME ESTADO MARQUESINAS Y TOTEMS", 105, 12, { align: "center" });
         
         doc.setFont("helvetica", "normal");
         doc.setFontSize(10);
-        doc.text("Inspección de Transportes - Junta de Castilla y León", 105, 18, { align: "center" });
+        doc.text("LEÓN - BUSCYL", 105, 18, { align: "center" });
 
         doc.setTextColor(100, 100, 100);
         doc.setFontSize(9);
@@ -1142,8 +1350,56 @@ window.addEventListener('load', function() {
     setTimeout(centrarMapaDesdeURL, 1000);
 });
 
+// --- SCRIPT GENERAL (Fuera del módulo) ---
 
+function mostrarFormularioLogin() {
+    const modal = document.getElementById('login-modal');
+    if (modal) modal.style.display = 'flex';
+}
+
+function ocultarFormularioLogin() {
+    const modal = document.getElementById('login-modal');
+    if (modal) modal.style.display = 'none';
+}
+
+// ... aquí irían tus otras funciones: initMap, renderizarPuntosExistentes, etc.
 
     </script>
+
+   <div id="login-modal" style="position: fixed !important; top: 0 !important; left: 0 !important; width: 100vw !important; height: 100vh !important; background-color: #0f172a !important; z-index: 999999 !important; display: flex !important; align-items: center !important; justify-content: center !important; box-sizing: border-box !important;">
+    
+    <div class="login-card" style="background: #ffffff !important; padding: 40px 35px; border-radius: 16px; box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.3); max-width: 400px; width: 100%; border: 1px solid #e2e8f0; text-align: center; box-sizing: border-box;">
+        
+        <div class="login-header">
+            <svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="#2563eb" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin: 0 auto 15px auto; display: block;">
+                <path d="M19 17h2c.6 0 1-.4 1-1v-3c0-.9-.7-1.7-1.5-1.9C18.7 10.6 16 10 16 10s-1.3-1.4-2.2-2.3c-.5-.4-1.1-.7-1.8-.7H5c-.6 0-1.1.4-1.4.9l-1.4 2.9A3.7 3.7 0 0 0 2 12v4c0 .6.4 1 1 1h2"/>
+                <circle cx="7" cy="17" r="2"/>
+                <path d="M9 17h6"/>
+                <circle cx="17" cy="17" r="2"/>
+            </svg>
+            <h2 style="font-size: 22px; font-weight: 700; color: #1e293b; margin: 0 0 6px 0; font-family: sans-serif;">Acceso al Sistema BUSCYL</h2>
+            <p style="font-size: 14px; color: #64748b; margin: 0 0 28px 0; font-family: sans-serif;">Inspección de Transportes · Castilla y León</p>
+        </div>
+        
+        <form onsubmit="event.preventDefault(); window.login(document.getElementById('email').value, document.getElementById('password').value);">
+            
+            <div class="input-group" style="margin-bottom: 20px; text-align: left;">
+                <label for="email" style="display: block; font-size: 13px; font-weight: 600; color: #475569; margin-bottom: 6px; font-family: sans-serif;">Email institucional</label>
+                <input type="email" id="email" placeholder="usuario@jcyl.es" required autocomplete="email" class="form-control">
+            </div>
+            
+            <div class="input-group" style="margin-bottom: 20px; text-align: left;">
+                <label for="password" style="display: block; font-size: 13px; font-weight: 600; color: #475569; margin-bottom: 6px; font-family: sans-serif;">Contraseña</label>
+                <input type="password" id="password" placeholder="••••••••" required autocomplete="current-password" class="form-control">
+            </div>
+            
+            <button type="submit" class="btn-login" style="width: 100%; background-color: #2563eb; color: white; border: none; border-radius: 8px; padding: 12px; font-size: 15px; font-weight: 600; cursor: pointer; box-shadow: 0 4px 6px -1px rgba(37, 99, 235, 0.2); font-family: sans-serif;">
+                Entrar al Sistema
+            </button>
+        </form>
+    </div>
+</div>
+</div>
+</div>
 </body>
 </html>
