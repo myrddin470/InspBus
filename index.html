@@ -1,0 +1,1148 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Inspección de Transportes de León - BUSCYL</title>
+    
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/proj4js/2.9.0/proj4.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js"></script>
+
+    <style>
+        :root {
+            --bg-main: #f8fafc;
+            --surface: #ffffff;
+            --text-main: #0f172a;
+            --text-muted: #64748b;
+            --primary: #2563eb;
+            --primary-hover: #1d4ed8;
+            --border: #e2e8f0;
+            --radius: 12px;
+            --shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            font-family: 'Inter', sans-serif;
+        }
+
+        body {
+            background-color: var(--bg-main);
+            color: var(--text-main);
+            height: 100vh;
+            display: flex;
+            overflow: hidden;
+            position: relative;
+        }
+
+        /* Botón Hamburguesa para Móviles */
+        #menu-toggle {
+            display: none;
+            position: absolute;
+            top: 12px;
+            left: 12px;
+            z-index: 1005;
+            background: linear-gradient(135deg, #1e3a8a 0%, #2563eb 100%);
+            color: white;
+            border: none;
+            padding: 12px 16px;
+            border-radius: 8px;
+            font-size: 16px;
+            font-weight: bold;
+            cursor: pointer;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+        }
+
+        /* Layout Principal */
+        #sidebar {
+            width: 380px;
+            background: var(--surface);
+            border-right: 1px solid var(--border);
+            display: flex;
+            flex-direction: column;
+            z-index: 1010;
+            box-shadow: 2px 0 10px rgba(0,0,0,0.05);
+            transition: transform 0.3s ease;
+        }
+
+        .sidebar-header {
+            padding: 24px;
+            border-bottom: 1px solid var(--border);
+            background: linear-gradient(135deg, #1e3a8a 0%, #2563eb 100%);
+            color: white;
+            position: relative;
+        }
+
+        .sidebar-header h1 { font-size: 18px; font-weight: 700; margin-bottom: 4px; color: #ffffff; }
+        .sidebar-header .subtitle-1 { font-size: 11px; font-weight: 500; opacity: 0.9; margin-bottom: 8px; line-height: 1.3; }
+        .sidebar-header .subtitle-2 { font-size: 13px; font-weight: 700; color: #f59e0b; letter-spacing: 0.05em; }
+
+        .close-sidebar-btn {
+            display: none;
+            position: absolute;
+            top: 16px; right: 16px;
+            background: rgba(255,255,255,0.2);
+            border: none; color: white;
+            border-radius: 50%; width: 28px; height: 28px;
+            font-size: 16px; cursor: pointer;
+        }
+
+        .sidebar-content {
+            flex: 1;
+            overflow-y: auto;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            gap: 18px;
+        }
+
+        .search-row-container {
+            display: flex;
+            gap: 8px;
+            align-items: center;
+        }
+
+        .search-box-container {
+            position: relative;
+            background: var(--surface);
+            border: 1px solid #cbd5e1;
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            padding: 2px 8px;
+            flex: 1;
+        }
+        .search-input { width: 100%; padding: 10px 6px; border: none; outline: none; font-size: 14px; }
+        .search-btn { background: none; border: none; cursor: pointer; padding: 6px; font-size: 16px; }
+        .search-results {
+            position: absolute; top: 105%; left: 0; right: 0;
+            background: var(--surface); border: 1px solid var(--border);
+            border-radius: 8px; max-height: 180px; overflow-y: auto;
+            z-index: 1100; box-shadow: var(--shadow); display: none;
+        }
+        .search-item { padding: 10px 14px; font-size: 13px; cursor: pointer; border-bottom: 1px solid var(--bg-main); }
+        .search-item:hover { background-color: #f1f5f9; }
+
+        .sidebar-gps-btn {
+            background: var(--surface);
+            color: var(--text-main);
+            border: 1px solid #cbd5e1;
+            border-radius: 8px;
+            width: 44px;
+            height: 44px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 18px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            box-shadow: 0 1px 2px rgba(0,0,0,0.05);
+        }
+        .sidebar-gps-btn:hover { background-color: var(--bg-main); color: var(--primary); border-color: #94a3b8; }
+
+        .sidebar-filter-section {
+            background: #f8fafc;
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            padding: 14px;
+        }
+        .sidebar-filter-section h4 {
+            font-size: 11px;
+            text-transform: uppercase;
+            color: var(--text-muted);
+            letter-spacing: 0.05em;
+            font-weight: 700;
+            margin-bottom: 10px;
+        }
+        .filter-group-row { display: flex; gap: 16px; }
+        .filter-label { display: flex; align-items: center; gap: 8px; font-size: 13px; font-weight: 500; cursor: pointer; color: var(--text-main); }
+        .filter-label input { cursor: pointer; width: 15px; height: 15px; }
+
+        .btn-group-vertical { display: flex; flex-direction: column; gap: 10px; }
+
+        .btn {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 6px;
+            padding: 10px 14px;
+            font-size: 13px;
+            font-weight: 500;
+            border-radius: var(--radius);
+            border: none;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+
+        .btn-primary { background-color: var(--primary); color: white; }
+        .btn-primary:hover { background-color: var(--primary-hover); }
+        .btn-secondary { background-color: var(--surface); color: var(--text-main); border: 1px solid var(--border); }
+        .btn-secondary:hover { background-color: var(--bg-main); border-color: #cbd5e1; }
+        .btn-danger { background-color: #ef4444; color: white; }
+        .btn-danger:hover { background-color: #dc2626; }
+        .btn-success { background-color: #10b981; color: white; }
+        .btn-success:hover { background-color: #059669; }
+        .btn-pdf { background-color: #dc2626; color: white; }
+        .btn-pdf:hover { background-color: #b91c1c; }
+        .btn-word { background-color: #124385; color: white; }
+        .btn-word:hover { background-color: #0c3264; }
+
+        /* Contenedor del Mapa */
+        #map-container { flex: 1; position: relative; height: 100%; width: 100%; }
+        #map { width: 100%; height: 100%; z-index: 1; }
+
+        #map-switch {
+            position: absolute; bottom: 24px; left: 24px;
+            width: 75px; height: 75px; border-radius: 8px;
+            border: 2px solid #fff; box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+            cursor: pointer; z-index: 1000; background-size: cover; background-position: center;
+        }
+        #map-switch .label { position: absolute; bottom: 0; left: 0; right: 0; background: rgba(0,0,0,0.6); color: #fff; font-size: 11px; text-align: center; padding: 2px 0; }
+
+        /* Modal Ficha */
+        .modal-overlay {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(15, 23, 42, 0.4); backdrop-filter: blur(4px);
+            display: none; justify-content: center; align-items: center;
+            z-index: 2000; padding: 12px;
+        }
+
+        .modal-container {
+            background: var(--surface); border-radius: var(--radius);
+            width: 100%; max-width: 860px; height: 92vh;
+            box-shadow: 0 20px 25px -5px rgb(0 0 0 / 0.1);
+            display: flex; flex-direction: column;
+            overflow: hidden;
+        }
+
+        .modal-header { 
+            padding: 16px 20px; 
+            border-bottom: 1px solid var(--border); 
+            display: flex; 
+            flex-wrap: wrap;
+            justify-content: space-between; 
+            align-items: center;
+            gap: 12px;
+            background-color: #f8fafc;
+        }
+        .modal-header h2 { font-size: 15px; font-weight: 700; color: #1e293b; }
+        .modal-action-bar { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+
+        .modal-body { padding: 16px; overflow-y: auto; flex: 1; background-color: var(--bg-main); }
+
+        /* Formularios */
+        .form-section { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 16px; margin-bottom: 16px; }
+        .form-section h3 { font-size: 13px; text-transform: uppercase; letter-spacing: 0.05em; color: var(--text-muted); margin-bottom: 12px; border-bottom: 1px solid var(--border); padding-bottom: 4px; }
+        
+        .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+        .grid-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px; }
+        .form-group { margin-bottom: 12px; }
+        .form-group label { display: block; font-size: 13px; font-weight: 500; margin-bottom: 4px; color: #334155; }
+        .form-control { width: 100%; padding: 10px; font-size: 14px; border-radius: 6px; border: 1px solid var(--border); background: var(--surface); outline: none; }
+
+        .row-inspect { display: grid; grid-template-columns: 1fr; gap: 8px; padding: 12px 0; border-bottom: 1px dashed var(--border); }
+        @media(min-width: 540px) { .row-inspect { grid-template-columns: 180px 160px 1fr; align-items: center; } }
+        
+        .radio-tile-group { display: flex; gap: 6px; }
+        .radio-tile { flex: 1; position: relative; display: flex; align-items: center; justify-content: center; padding: 8px; border: 1px solid var(--border); border-radius: 6px; cursor: pointer; font-size: 12px; font-weight: 500; background: var(--surface); text-align: center;}
+        .radio-tile input { position: absolute; opacity: 0; width: 100%; height: 100%; }
+        
+        .radio-tile-group .ok-check:checked + span { background: #10b981; border-color: #10b981; color: white; display: block; width: 100%; border-radius: 4px; padding: 2px 0;}
+        .radio-tile-group .def-check:checked + span { background: #ef4444; border-color: #ef4444; color: white; display: block; width: 100%; border-radius: 4px; padding: 2px 0;}
+        .radio-tile-group .si-check:checked + span { background: #f59e0b; border-color: #f59e0b; color: white; display: block; width: 100%; border-radius: 4px; padding: 2px 0;}
+        .radio-tile-group .no-check:checked + span { background: #64748b; border-color: #64748b; color: white; display: block; width: 100%; border-radius: 4px; padding: 2px 0;}
+
+        .checkbox-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(130px, 1fr)); gap: 8px; }
+        .checkbox-label { display: flex; align-items: center; gap: 8px; font-size: 12px; background: var(--bg-main); padding: 8px; border-radius: 6px; cursor: pointer; border: 1px solid var(--border); }
+
+        @media (max-width: 992px) {
+            #menu-toggle { display: block; }
+            #sidebar { position: absolute; top: 0; left: 0; bottom: 0; width: 320px; transform: translateX(-100%); z-index: 2005; }
+            #sidebar.open { transform: translateX(0); }
+            .close-sidebar-btn { display: block; }
+            #map-switch { bottom: 16px; left: 16px; width: 65px; height: 65px; }
+            .grid-2, .grid-3 { grid-template-columns: 1fr; gap: 0; }
+            .modal-action-bar { width: 100%; justify-content: space-between; }
+            .modal-container { height: 95vh; }
+        }
+    </style>
+</head>
+<body>
+
+    <button id="menu-toggle" onclick="toggleSidebar()">☰ Menú Opciones</button>
+
+    <div id="sidebar">
+        <div class="sidebar-header">
+            <h1>Inspección de Transportes de León</h1>
+            <div class="subtitle-1">Servicio Territorial de Movilidad, Transformación Digital e IA </div>
+            <div class="subtitle-2">Control de Marquesinas y Tótems. BUSCYL</div>
+            <button class="close-sidebar-btn" onclick="toggleSidebar()">✕</button>
+        </div>
+        <div class="sidebar-content">
+            <div class="form-group" style="margin-bottom: 0;">
+                <label style="font-weight: 600; font-size: 13px; color: #475569; margin-bottom: 6px;">Buscar Localidad o Dirección</label>
+                <div class="search-row-container">
+                    <div class="search-box-container">
+                        <input type="text" id="searchAddress" class="search-input" placeholder="Ej: León, Ponferrada, Calle Ancha..." onkeyup="evaluarTeclaBuscador(event)">
+                        <button class="search-btn" onclick="buscarDireccion()">🔍</button>
+                        <div id="searchResults" class="search-results"></div>
+                    </div>
+                    <button class="sidebar-gps-btn" onclick="obtenerUbicacionGPS()" title="Centrar en mi ubicación actual">🎯</button>
+                </div>
+            </div>
+
+            <div class="sidebar-filter-section">
+                <h4>Filtrar Activos en Mapa</h4>
+                <div class="filter-group-row">
+                    <label class="filter-label"><input type="checkbox" id="filtroMarquesinas" checked onchange="renderizarPuntosExistentes()"> 🚌 Marquesinas</label>
+                    <label class="filter-label"><input type="checkbox" id="filtroTotems" checked onchange="renderizarPuntosExistentes()"> 🪧 Tótems</label>
+                </div>
+            </div>
+
+            <hr style="border: 0; border-top: 1px solid var(--border); margin: 2px 0;">
+
+            <div class="btn-group-vertical">
+                <button class="btn btn-primary" onclick="exportarJSON()">📥 Exportar datos (.JSON)</button>
+                <button class="btn btn-secondary" onclick="importarJSON()">📤 Importar datos (.JSON)</button>
+                <button class="btn btn-pdf" onclick="generarInformeUbicacionesPDF()">📋 Generar Informe Ubicaciones (.PDF)</button>
+                <input type="file" id="importFile" style="display: none;" accept=".json" onchange="procesarImportacion(event)">
+            </div>
+        </div>
+    </div>
+
+    <div id="map-container">
+        <div id="map"></div>
+        <div id="map-switch" onclick="toggleMapLayer()"><div class="label" id="switch-label">Satélite</div></div>
+    </div>
+
+    <div class="modal-overlay" id="modalForm">
+        <div class="modal-container">
+            <div class="modal-header">
+                <h2 id="modalTitle">Ficha de Inspección</h2>
+                <div class="modal-action-bar">
+                    <button type="button" class="btn btn-danger" id="btnBorrar" onclick="borrarPunto()">Eliminar</button>
+                    <button type="button" class="btn btn-secondary" onclick="cerrarModal()">Cancelar</button>
+                    <button type="button" class="btn btn-primary" onclick="guardarFormulario()">Guardar</button>
+                </div>
+            </div>
+            <div class="modal-body">
+    <form id="inspectionForm">
+        <input type="hidden" id="elemId">
+
+        <div class="form-section">
+            <div style="display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 10px; margin-bottom: 12px;">
+                <div style="flex: 1; min-width: 180px;">
+                    <label style="font-weight:500; font-size:13px;">Tipo de elemento:</label>
+                    <select id="elemTipo" class="form-control" onchange="renderFormFields()" style="font-weight: 600; color: var(--primary);">
+                        <option value="MARQUESINA">🚌 MARQUESINA</option>
+                        <option value="TOTEM">🪧 TÓTEM</option>
+                    </select>
+                </div>
+                <div style="display: flex; flex-wrap: wrap; gap: 6px; align-items: flex-end;">
+                    <button type="button" class="btn btn-success" onclick="abrirEnGoogleMaps()">🌐 Maps</button>
+                    <button type="button" class="btn btn-pdf" onclick="generarFichaIndividualPDF()">📄 Ficha PDF</button>
+                    <button type="button" class="btn btn-word" onclick="exportarFichaXMLParaWord()">📝 Mapear XML Word</button>
+                </div>
+            </div>
+
+            <div class="grid-2" style="margin-bottom: 12px;">
+                <div class="form-group">
+                    <label>Latitud (WGS84 / Google Maps)</label>
+                    <input type="text" id="geoLat" class="form-control" style="font-weight: bold; border-color: #10b981; background-color: #f0fdf4;" oninput="actualizarDesdeLatLng()">
+                </div>
+                <div class="form-group">
+                    <label>Longitud (WGS84 / Google Maps)</label>
+                    <input type="text" id="geoLng" class="form-control" style="font-weight: bold; border-color: #10b981; background-color: #f0fdf4;" oninput="actualizarDesdeLatLng()">
+                </div>
+            </div>
+
+            <div class="grid-2">
+                <div class="form-group">
+                    <label>Coordenada UTM X (ETRS89)</label>
+                    <input type="number" step="any" id="utmX" class="form-control" style="font-weight: bold; border-color: #2563eb; background-color: #eff6ff;" onchange="actualizarDesdeUTM()">
+                </div>
+                <div class="form-group">
+                    <label>Coordenada UTM Y (ETRS89)</label>
+                    <input type="number" step="any" id="utmY" class="form-control" style="font-weight: bold; border-color: #2563eb; background-color: #eff6ff;" onchange="actualizarDesdeUTM()">
+                </div>
+            </div>
+        </div>
+
+        <div id="dinamicFields"></div>
+    </form>
+</div>
+        </div>
+    </div>
+
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+
+    <script>
+        proj4.defs("EPSG:25830", "+proj=utm +zone=30 +ellps=GRS80 +towgs84=0,0,0,0,0,0,0 +units=m +no_defs");
+
+        let map;
+        let currentLayer = 'road';
+        let layers = {};
+        let dbData = {}; 
+        let marcadoresGrupo = [];
+        let marcadorGpsTemporal = null;
+        let marcadorTemporalEdicion = null;
+        const imgSat = "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/10/374/180.png";
+
+        window.addEventListener('DOMContentLoaded', () => {
+            initMap();
+            cargarDatosLocales();
+            configurarAvisoSalida();
+            document.getElementById('map-switch').style.backgroundImage = `url('${imgSat}')`;
+        });
+
+        function toggleSidebar() { document.getElementById('sidebar').classList.toggle('open'); }
+
+        function initMap() {
+            map = L.map('map', { center: [42.599, -5.567], zoom: 15, zoomControl: false });
+            layers.road = L.tileLayer('https://mt1.google.com/vt/lyrs=m&hl=es&x={x}&y={y}&z={z}', { attribution: '© Google Maps', maxZoom: 21 }).addTo(map);
+            layers.satellite = L.tileLayer('https://mt1.google.com/vt/lyrs=y&hl=es&x={x}&y={y}&z={z}', { attribution: '© Google Maps', maxZoom: 21 });
+            map.on('click', function(e) { abrirFormularioNuevo(e.latlng.lat, e.latlng.lng); });
+        }
+
+        function toggleMapLayer() {
+            if (currentLayer === 'road') {
+                map.removeLayer(layers.road); map.addLayer(layers.satellite); currentLayer = 'satellite';
+                document.getElementById('switch-label').innerText = 'Mapa';
+            } else {
+                map.removeLayer(layers.satellite); map.addLayer(layers.road); currentLayer = 'road';
+                document.getElementById('switch-label').innerText = 'Satélite';
+            }
+        }
+
+        function abrirEnGoogleMaps() {
+            const lat = document.getElementById('geoLat').value;
+            const lng = document.getElementById('geoLng').value;
+            if (lat && lng) window.open(`https://www.google.com/maps/search/?api=1&query=${lat},${lng}`, '_blank');
+        }
+
+        function obtenerUbicacionGPS() {
+            if (!navigator.geolocation) { alert("Tu navegador no soporta geolocalización."); return; }
+            navigator.geolocation.getCurrentPosition((pos) => {
+                const lat = pos.coords.latitude; const lng = pos.coords.longitude;
+                map.setView([lat, lng], 17);
+                if (marcadorGpsTemporal) map.removeLayer(marcadorGpsTemporal);
+                marcadorGpsTemporal = L.circleMarker([lat, lng], { radius: 10, fillColor: '#2563eb', color: '#fff', weight: 3, fillOpacity: 0.8 }).addTo(map).bindPopup("Te encuentras aquí").openPopup();
+            }, () => { alert("Error al obtener ubicación."); }, { enableHighAccuracy: true });
+        }
+
+        function evaluarTeclaBuscador(e) { if (e.key === 'Enter') buscarDireccion(); }
+        function buscarDireccion() {
+            const query = document.getElementById('searchAddress').value; if (query.trim().length < 3) return;
+            fetch(`https://nominatim.openstreetmap.org/search?format=json&viewbox=-7.0,43.2,-3.5,41.0&bounded=1&q=${encodeURIComponent(query)}&accept-language=es`)
+            .then(res => res.json()).then(data => {
+                const resContainer = document.getElementById('searchResults'); resContainer.innerHTML = '';
+                if (data.length === 0) { resContainer.innerHTML = '<div class="search-item">No hay resultados</div>'; resContainer.style.display = 'block'; return; }
+                data.forEach(item => {
+                    const div = document.createElement('div'); div.className = 'search-item'; div.innerText = item.display_name.split(', Castilla y León')[0];
+                    div.onclick = () => { map.setView([parseFloat(item.lat), parseFloat(item.lon)], 16); resContainer.style.display = 'none'; };
+                    resContainer.appendChild(div);
+                });
+                resContainer.style.display = 'block';
+            });
+        }
+
+        function geocodificarInversa(lat, lng, callback) {
+            fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}&zoom=18&addressdetails=1&accept-language=es`)
+            .then(res => res.json()).then(data => {
+                let res = { calle: '', municipio: '', provincia: 'León' };
+                if (data && data.address) {
+                    res.calle = data.address.road || data.address.pedestrian || '';
+                    res.municipio = data.address.city || data.address.town || data.address.village || '';
+                    res.provincia = data.address.province || 'León';
+                }
+                callback(res);
+            }).catch(() => callback({ calle: '', municipio: '', provincia: 'León' }));
+        }
+
+        function conversionAUtm(lat, lng) {
+            try { const r = proj4("WGS84", "EPSG:25830", [lng, lat]); return { x: r[0].toFixed(2), y: r[1].toFixed(2) }; } catch (e) { return { x: "0", y: "0" }; }
+        }
+
+        // 1. Cuando el usuario edita las coordenadas UTM
+function actualizarDesdeUTM() {
+    const xStr = document.getElementById('utmX').value;
+    const yStr = document.getElementById('utmY').value;
+    if (!xStr || !yStr) return;
+
+    try {
+        const coordenadas = proj4("EPSG:25830", "WGS84", [parseFloat(xStr), parseFloat(yStr)]);
+        // Redondeamos a 6 decimales para las coordenadas geográficas
+        const lng = coordenadas[0];
+        const lat = coordenadas[1];
+
+        document.getElementById('geoLat').value = lat.toFixed(6);
+        document.getElementById('geoLng').value = lng.toFixed(6);
+
+        moverChinchetaYDireccion(lat, lng);
+    } catch (e) {
+        alert("Las coordenadas UTM introducidas no son válidas.");
+    }
+}
+
+// 2. Cuando el usuario edita las coordenadas de Google Maps (Lat/Lng)
+function actualizarDesdeLatLng() {
+    let latCampo = document.getElementById('geoLat');
+    let lngCampo = document.getElementById('geoLng');
+    
+    let latVal = latCampo.value.trim();
+    let lngVal = lngCampo.value.trim();
+
+    // 1. EL TRUCO MAGICO: Detección de pegado completo de Google Maps
+    // Si pegas "42.599, -5.567" en la latitud, lo detecta y lo divide
+    if (latVal.includes(',') && latVal.split(',').length === 2) {
+        let partes = latVal.split(',');
+        latVal = partes[0].trim();
+        lngVal = partes[1].trim();
+        
+        // Colocamos los números limpios en sus respectivas cajas
+        latCampo.value = latVal;
+        lngCampo.value = lngVal;
+    }
+
+    // Si alguno de los dos está vacío, paramos aquí
+    if (!latVal || !lngVal) return;
+
+    try {
+        // 2. Parseamos a números de forma segura
+        const lat = parseFloat(latVal);
+        const lng = parseFloat(lngVal);
+
+        if (isNaN(lat) || isNaN(lng)) return;
+
+        // 3. Calculamos UTM
+        const utm = conversionAUtm(lat, lng);
+        document.getElementById('utmX').value = utm.x;
+        document.getElementById('utmY').value = utm.y;
+
+        // 4. Movemos la chincheta y sacamos la dirección postal
+        moverChinchetaYDireccion(lat, lng);
+    } catch (e) {
+        console.error("Error procesando Lat/Lng", e);
+    }
+}
+
+// 3. Función centralizada para mover el mapa, la chincheta y rellenar la calle
+function moverChinchetaYDireccion(lat, lng) {
+    map.setView([lat, lng], 18);
+
+    if (marcadorTemporalEdicion) {
+        marcadorTemporalEdicion.setLatLng([lat, lng]);
+    } else {
+        const iconEdit = L.divIcon({
+            html: `<svg width="32" height="32" viewBox="0 0 24 24" fill="#ef4444" stroke="white" stroke-width="2"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"></path><circle cx="12" cy="10" r="3" fill="white"></circle></svg>`,
+            className: 'custom-pin', iconSize: [32, 32], iconAnchor: [16, 32]
+        });
+        marcadorTemporalEdicion = L.marker([lat, lng], { icon: iconEdit, zIndexOffset: 1000 }).addTo(map);
+    }
+
+    // Actualiza los campos de dirección
+    geocodificarInversa(lat, lng, function(info) {
+        if(document.getElementById('calle')) document.getElementById('calle').value = info.calle;
+        if(document.getElementById('municipio')) document.getElementById('municipio').value = info.municipio;
+        if(document.getElementById('provincia')) document.getElementById('provincia').value = info.provincia;
+    });
+}
+
+        function cargarDatosLocales() { const data = localStorage.getItem('inspecciones_transporte'); if (data) { dbData = JSON.parse(data); renderizarPuntosExistentes(); } }
+        function guardarDatosLocales() { localStorage.setItem('inspecciones_transporte', JSON.stringify(dbData)); renderizarPuntosExistentes(); }
+
+        function renderizarPuntosExistentes() {
+            marcadoresGrupo.forEach(m => map.removeLayer(m)); marcadoresGrupo = [];
+            const verM = document.getElementById('filtroMarquesinas').checked;
+            const verT = document.getElementById('filtroTotems').checked;
+            Object.keys(dbData).forEach(id => {
+                const item = dbData[id];
+                if (item.elemTipo === 'MARQUESINA' && !verM) return;
+                if (item.elemTipo === 'TOTEM' && !verT) return;
+                const col = item.elemTipo === 'MARQUESINA' ? '#2563eb' : '#f59e0b';
+                const icon = L.divIcon({
+                    html: `<svg width="32" height="32" viewBox="0 0 24 24" fill="${col}" stroke="white" stroke-width="2"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"></path><circle cx="12" cy="10" r="3" fill="white"></circle></svg>`,
+                    className: 'custom-pin', iconSize: [32, 32], iconAnchor: [16, 32]
+                });
+                const m = L.marker([item.geoLat, item.geoLng], { icon }).addTo(map);
+                m.on('click', (e) => { L.DomEvent.stopPropagation(e); abrirFormularioEditar(id); });
+                marcadoresGrupo.push(m);
+            });
+        }
+
+        function abrirFormularioNuevo(lat, lng) {
+            const id = 'id_' + new Date().getTime();
+            document.getElementById('elemId').value = id; 
+
+            document.getElementById('geoLat').value = lat.toFixed(6); 
+            document.getElementById('geoLng').value = lng.toFixed(6);
+            document.getElementById('elemTipo').value = 'MARQUESINA';
+            const utm = conversionAUtm(lat, lng); document.getElementById('utmX').value = utm.x; document.getElementById('utmY').value = utm.y;
+            document.getElementById('modalTitle').innerText = "Nueva Inspección de Punto";
+            document.getElementById('btnBorrar').style.display = 'none';
+            renderFormFields(); document.getElementById('modalForm').style.display = 'flex';
+            geocodificarInversa(lat, lng, function(info) {
+                if(document.getElementById('calle')) document.getElementById('calle').value = info.calle;
+                if(document.getElementById('municipio')) document.getElementById('municipio').value = info.municipio;
+                if(document.getElementById('provincia')) document.getElementById('provincia').value = info.provincia;
+            });
+        }
+
+        function abrirFormularioEditar(id) {
+            const item = dbData[id]; if (!item) return;
+            document.getElementById('elemId').value = id; document.getElementById('geoLat').value = item.geoLat; document.getElementById('geoLng').value = item.geoLng;
+            document.getElementById('elemTipo').value = item.elemTipo; document.getElementById('utmX').value = item.utmX; document.getElementById('utmY').value = item.utmY;
+            document.getElementById('modalTitle').innerText = `Editar Inspección`;
+            document.getElementById('btnBorrar').style.display = 'inline-flex';
+            renderFormFields();
+            const form = document.getElementById('inspectionForm');
+            Array.from(form.elements).forEach(el => {
+                if(el.id && item[el.id] !== undefined) { if(el.type === 'checkbox') el.checked = item[el.id]; else el.value = item[el.id]; }
+                if (el.type === 'radio' && item[el.name] === el.value) el.checked = true;
+            });
+            document.getElementById('modalForm').style.display = 'flex';
+        }
+
+       function cerrarModal() { 
+    document.getElementById('modalForm').style.display = 'none'; 
+    document.getElementById('inspectionForm').reset(); 
+    
+    // Eliminamos la chincheta temporal de edición si existe
+    if (marcadorTemporalEdicion) {
+        map.removeLayer(marcadorTemporalEdicion);
+        marcadorTemporalEdicion = null;
+    }
+}
+
+        function renderFormFields() {
+    const tipo = document.getElementById('elemTipo').value;
+    const container = document.getElementById('dinamicFields');
+    const form = document.getElementById('inspectionForm');
+
+    // 1. Guardar el estado actual de los inputs antes de que desaparezcan
+    // Usamos FormData para capturar todos los valores de forma sencilla
+    const formData = new FormData(form);
+    const estadoActual = {};
+    for (let [key, value] of formData.entries()) {
+        estadoActual[key] = value;
+    }
+    // Capturar checkboxes manualmente porque FormData no los incluye si no están marcados
+    Array.from(form.querySelectorAll('input[type="checkbox"]')).forEach(cb => {
+        estadoActual[cb.id] = cb.checked;
+    });
+
+    // 2. Generar el nuevo HTML
+    if (tipo === 'MARQUESINA') {
+        container.innerHTML = `
+            <div class="form-section">
+                <h3>1. Datos de Identificación</h3>
+                <div class="grid-2">
+                    <div class="form-group"><label>Nº de Serie</label><input type="text" id="nSerie" class="form-control" name="nSerie"></div>
+                    <div class="form-group"><label>Calle</label><input type="text" id="calle" class="form-control" name="calle"></div>
+                </div>
+                <div class="grid-3">
+                    <div class="form-group"><label>Municipio / Localidad</label><input type="text" id="municipio" class="form-control" name="municipio"></div>
+                    <div class="form-group"><label>Provincia</label><input type="text" id="provincia" class="form-control" name="provincia"></div>
+                    <div class="form-group"><label>Fecha Inspección</label><input type="date" id="fechaInsp" class="form-control" name="fechaInsp"></div>
+                </div>
+                <div class="form-group"><label>Técnico Inspector</label><input type="text" id="tecnico" class="form-control" name="tecnico"></div>
+            </div>
+            <div class="form-section">
+                <h3>2. Elementos Estructurales</h3>
+                ${renderRowInspection("Estructura (soportes, pilares)", "inspEstructura")}
+                ${renderRowInspection("Cubierta / Techo", "inspTecho")}
+                ${renderRowInspection("Laterales / Paneles", "inspPaneles")}
+                ${renderRowInspection("Soporte isquiático / Bancos", "inspBancos")}
+                ${renderRowInspection("Cristales", "inspCristales")}
+                ${renderRowInspection("Iluminación", "inspIluminacion")}
+                ${renderRowInspection("Pantalla frontal superior", "inspPantallaSup")}
+                ${renderRowInspection("Pantalla lateral exterior", "inspPantallaLat")}
+                ${renderRowInspection("Pantalla táctil interior", "inspPantallaInt")}
+                ${renderRowInspection("Lector de tarjeta NFC", "inspNfc")}
+                ${renderRowInspection("Publicidad / Paneles inf.", "inspPublicidad")}
+                ${renderRowInspection("Señalización y cartelería", "inspCarteleria")}
+                ${renderRowInspection("Anclajes al suelo", "inspAnclajes")}
+            </div>
+            <div class="form-section">
+                <h3>3. Comprobaciones de Estado</h3>
+                ${renderRowEstado("Rayones", "estRayones")}
+                ${renderRowEstado("Golpes / Deformaciones", "estGolpes")}
+                ${renderRowEstado("Grafitis", "estGrafitis")}
+                ${renderRowContrastado("Funcionamiento correcto", "estFuncionamiento")}
+                ${renderRowContrastado("Información actualizada", "estInfo")}
+                ${renderRowInspection("Limpieza General", "estLimpieza")}
+            </div>
+            <div class="form-section">
+                <h3>4. Conclusiones y Acciones Propuestas</h3>
+                <div class="form-group"><textarea id="conclusiones" class="form-control" name="conclusiones" rows="3"></textarea></div>
+            </div>
+        `;
+    } else {
+        container.innerHTML = `
+            <div class="form-section">
+                <h3>1. Datos de Identificación</h3>
+                <div class="form-group"><label>Calle</label><input type="text" id="calle" class="form-control" name="calle"></div>
+                <div class="grid-3">
+                    <div class="form-group"><label>Municipio / Localidad</label><input type="text" id="municipio" class="form-control" name="municipio"></div>
+                    <div class="form-group"><label>Provincia</label><input type="text" id="provincia" class="form-control" name="provincia"></div>
+                    <div class="form-group"><label>Fecha Inspección</label><input type="date" id="fechaInsp" class="form-control" name="fechaInsp"></div>
+                </div>
+                <div class="form-group"><label>Técnico Inspector</label><input type="text" id="tecnico" class="form-control" name="tecnico"></div>
+            </div>
+            <div class="form-section">
+                <h3>2. Estado General</h3>
+                <div class="checkbox-grid">
+                    <label class="checkbox-label"><input type="checkbox" id="totemDanioSin"> Sin daños</label>
+                    <label class="checkbox-label"><input type="checkbox" id="totemDanioRayones"> Rayones</label>
+                    <label class="checkbox-label"><input type="checkbox" id="totemDanioGolpes"> Golpes</label>
+                    <label class="checkbox-label"><input type="checkbox" id="totemDanioGrafitis"> Grafitis</label>
+                    <label class="checkbox-label"><input type="checkbox" id="totemDanioCorrosion"> Corrosión</label>
+                    <label class="checkbox-label" style="grid-column: span 2;"><input type="checkbox" id="totemDanioOtros"> Otros</label>
+                </div>
+                <div class="form-group" style="margin-top: 10px;">
+                    <textarea id="totemDetalleOtros" class="form-control" name="totemDetalleOtros" rows="2" placeholder="Detalle otros estados..."></textarea>
+                </div>
+            </div>
+            <div class="form-section">
+                <h3>3. Soporte Estructural</h3>
+                <div class="checkbox-grid">
+                    <label class="checkbox-label"><input type="checkbox" id="sopDanyado"> Dañado</label>
+                    <label class="checkbox-label"><input type="checkbox" id="sopEstable"> Estable</label>
+                    <label class="checkbox-label"><input type="checkbox" id="sopAnclaje"> Anclaje OK</label>
+                </div>
+            </div>
+            <div class="form-section">
+                <h3>4. Evaluación Global</h3>
+                <div class="form-group">
+                    <select id="resultadoInspeccion" class="form-control" name="resultadoInspeccion">
+                        <option value="CORRECTO">✅ Correcto</option>
+                        <option value="INCIDENCIAS_LEVES">⚠️ Incidencias Leves</option>
+                        <option value="INCIDENCIAS_GRAVES">❌ Incidencias Graves</option>
+                    </select>
+                </div>
+            </div>
+            <div class="form-section">
+                <h3>5. Conclusiones</h3>
+                <div class="form-group"><textarea id="conclusiones" class="form-control" name="conclusiones" rows="3"></textarea></div>
+            </div>
+        `;
+    }
+
+    // 3. Volver a rellenar los inputs con los datos guardados
+    Object.keys(estadoActual).forEach(key => {
+        const el = document.getElementById(key);
+        if (el) {
+            if (el.type === 'checkbox') {
+                el.checked = estadoActual[key];
+            } else {
+                el.value = estadoActual[key];
+            }
+        }
+    });
+}
+
+        function renderRowInspection(label, name) { return `<div class="row-inspect"><span>${label}</span><div class="radio-tile-group"><label class="radio-tile"><input type="radio" name="${name}" value="OK" class="ok-check"><span>OK</span></label><label class="radio-tile"><input type="radio" name="${name}" value="DEFECTO" class="def-check"><span>DEFECTO</span></label></div><input type="text" id="${name}_obs" placeholder="Observaciones" class="form-control" style="padding:5px; font-size:12px;"></div>`; }
+        function renderRowEstado(label, name) { return `<div class="row-inspect"><span>${label}</span><div class="radio-tile-group"><label class="radio-tile"><input type="radio" name="${name}" value="SI" class="si-check"><span>Sí</span></label><label class="radio-tile"><input type="radio" name="${name}" value="NO" class="no-check"><span>No</span></label></div><input type="text" id="${name}_det" placeholder="Detalle" class="form-control" style="padding:5px; font-size:12px;"></div>`; }
+        function renderRowContrastado(label, name) { return `<div class="row-inspect"><span>${label}</span><div class="radio-tile-group"><label class="radio-tile"><input type="radio" name="${name}" value="OK" class="ok-check"><span>Correcto</span></label><label class="radio-tile"><input type="radio" name="${name}" value="DEFECTO" class="def-check"><span>Incorr.</span></label></div><input type="text" id="${name}_det" placeholder="Detalle" class="form-control" style="padding:5px; font-size:12px;"></div>`; }
+
+        function guardarFormulario() {
+            const id = document.getElementById('elemId').value; const form = document.getElementById('inspectionForm');
+            let obj = { elemId: id, elemTipo: document.getElementById('elemTipo').value, geoLat: parseFloat(document.getElementById('geoLat').value), geoLng: parseFloat(document.getElementById('geoLng').value), utmX: document.getElementById('utmX').value, utmY: document.getElementById('utmY').value };
+            Array.from(form.elements).forEach(el => {
+                if (el.id && !['elemId','elemTipo','geoLat','geoLng','utmX','utmY'].includes(el.id)) obj[el.id] = el.type === 'checkbox' ? el.checked : el.value;
+                if (el.type === 'radio' && el.checked) obj[el.name] = el.value;
+            });
+            dbData[id] = obj; guardarDatosLocales(); cerrarModal();
+        }
+
+        function borrarPunto() { const id = document.getElementById('elemId').value; if(confirm("¿Eliminar?")) { delete dbData[id]; guardarDatosLocales(); cerrarModal(); } }
+        function exportarJSON() { const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(dbData, null, 2)); const a = document.createElement('a'); a.setAttribute("href", dataStr); a.setAttribute("download", `Inspecciones.json`); document.body.appendChild(a); a.click(); a.remove(); }
+        function importarJSON() { document.getElementById('importFile').click(); }
+        function procesarImportacion(ev) { const f = ev.target.files[0]; if (!f) return; const r = new FileReader(); r.onload = function(e) { try { dbData = { ...dbData, ...JSON.parse(e.target.result) }; guardarDatosLocales(); alert("¡Datos combinados!"); } catch (e) { alert("Archivo inválido."); } }; r.readAsText(f); }
+        function configurarAvisoSalida() { window.addEventListener('beforeunload', (e) => { e.preventDefault(); e.returnValue = ''; }); }
+
+        // ==========================================
+        //  NUEVA LÓGICA: GENERADOR DE XML CONSOLIDADO
+        // ==========================================
+        function exportarFichaXMLParaWord() {
+            try {
+                const form = document.getElementById('inspectionForm');
+                const tipoActivo = document.getElementById('elemTipo').value;
+                
+                // Recopilar de forma segura todos los elementos del formulario abierto
+                let fData = {};
+                Array.from(form.elements).forEach(el => {
+                    if (el.id) {
+                        fData[el.id] = el.type === 'checkbox' ? (el.checked ? "SÍ" : "NO") : el.value;
+                    }
+                    if (el.type === 'radio' && el.checked) {
+                        fData[el.name] = el.value;
+                    }
+                });
+
+                // Helper para extraer campos dinámicos de texto u opciones que pudieran estar vacíos
+                const getVal = (id) => fData[id] || "";
+                const escapeXml = (str) => String(str).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&apos;');
+
+                // Construcción de la cadena XML plana y consolidada
+                let xml = `<?xml version="1.0" encoding="UTF-8"?>\n`;
+                xml += `<FichaInspeccion>\n`;
+                
+                // 1. Datos del Sistema Base e Identificación
+                xml += `    <ElemId>${escapeXml(document.getElementById('elemId').value)}</ElemId>\n`;
+                xml += `    <ElemTipo>${escapeXml(tipoActivo)}</ElemTipo>\n`;
+                xml += `    <NSerie>${escapeXml(getVal('nSerie') || "N/A")}</NSerie>\n`;
+                xml += `    <Calle>${escapeXml(getVal('calle'))}</Calle>\n`;
+                xml += `    <Municipio>${escapeXml(getVal('municipio'))}</Municipio>\n`;
+                xml += `    <Provincia>${escapeXml(getVal('provincia'))}</Provincia>\n`;
+                xml += `    <FechaInsp>${escapeXml(getVal('fechaInsp'))}</FechaInsp>\n`;
+                xml += `    <Tecnico>${escapeXml(getVal('tecnico'))}</Tecnico>\n`;
+                
+                // 2. Coordenadas y Ubicación Terrestre
+                xml += `    <GeoLat>${escapeXml(document.getElementById('geoLat').value)}</GeoLat>\n`;
+                xml += `    <GeoLng>${escapeXml(document.getElementById('geoLng').value)}</GeoLng>\n`;
+                xml += `    <UtmX>${escapeXml(document.getElementById('utmX').value)}</UtmX>\n`;
+                xml += `    <UtmY>${escapeXml(document.getElementById('utmY').value)}</UtmY>\n`;
+                
+                // 3. Resultados Generales
+                xml += `    <ResultadoInspeccion>${escapeXml(getVal('resultadoInspeccion') || (tipoActivo === 'MARQUESINA' ? 'REVISADO' : ''))}</ResultadoInspeccion>\n`;
+                xml += `    <Conclusiones>${escapeXml(getVal('conclusiones'))}</Conclusiones>\n`;
+                
+                // 4. Bloque Marquesinas (Radios de Estado + Observaciones de texto adjuntas)
+                xml += `    <InspEstructura>${escapeXml(getVal('inspEstructura'))}</InspEstructura>\n`;
+                xml += `    <InspEstructuraObs>${escapeXml(getVal('inspEstructura_obs'))}</InspEstructuraObs>\n`;
+                xml += `    <InspTecho>${escapeXml(getVal('inspTecho'))}</InspTecho>\n`;
+                xml += `    <InspTechoObs>${escapeXml(getVal('inspTecho_obs'))}</InspTechoObs>\n`;
+                xml += `    <InspPaneles>${escapeXml(getVal('inspPaneles'))}</InspPaneles>\n`;
+                xml += `    <InspPanelesObs>${escapeXml(getVal('inspPaneles_obs'))}</InspPanelesObs>\n`;
+                xml += `    <InspBancos>${escapeXml(getVal('inspBancos'))}</InspBancos>\n`;
+                xml += `    <InspBancosObs>${escapeXml(getVal('inspBancos_obs'))}</InspBancosObs>\n`;
+                xml += `    <InspCristales>${escapeXml(getVal('inspCristales'))}</InspCristales>\n`;
+                xml += `    <InspCristalesObs>${escapeXml(getVal('inspCristales_obs'))}</InspCristalesObs>\n`;
+                xml += `    <InspIluminacion>${escapeXml(getVal('inspIluminacion'))}</InspIluminacion>\n`;
+                xml += `    <InspIluminacionObs>${escapeXml(getVal('inspIluminacion_obs'))}</InspIluminacionObs>\n`;
+                xml += `    <InspPantallaSup>${escapeXml(getVal('inspPantallaSup'))}</InspPantallaSup>\n`;
+                xml += `    <InspPantallaSupObs>${escapeXml(getVal('inspPantallaSup_obs'))}</InspPantallaSupObs>\n`;
+                xml += `    <InspPantallaLat>${escapeXml(getVal('inspPantallaLat'))}</InspPantallaLat>\n`;
+                xml += `    <InspPantallaLatObs>${escapeXml(getVal('inspPantallaLat_obs'))}</InspPantallaLatObs>\n`;
+                xml += `    <InspPantallaInt>${escapeXml(getVal('inspPantallaInt'))}</InspPantallaInt>\n`;
+                xml += `    <InspPantallaIntObs>${escapeXml(getVal('inspPantallaInt_obs'))}</InspPantallaIntObs>\n`;
+                xml += `    <InspNfc>${escapeXml(getVal('inspNfc'))}</InspNfc>\n`;
+                xml += `    <InspNfcObs>${escapeXml(getVal('inspNfc_obs'))}</InspNfcObs>\n`;
+                xml += `    <InspPublicidad>${escapeXml(getVal('inspPublicidad'))}</InspPublicidad>\n`;
+                xml += `    <InspPublicidadObs>${escapeXml(getVal('inspPublicidad_obs'))}</InspPublicidadObs>\n`;
+                xml += `    <InspCarteleria>${escapeXml(getVal('inspCarteleria'))}</InspCarteleria>\n`;
+                xml += `    <InspCarteleriaObs>${escapeXml(getVal('inspCarteleria_obs'))}</InspCarteleriaObs>\n`;
+                xml += `    <InspAnclajes>${escapeXml(getVal('inspAnclajes'))}</InspAnclajes>\n`;
+                xml += `    <InspAnclajesObs>${escapeXml(getVal('inspAnclajes_obs'))}</InspAnclajesObs>\n`;
+                
+                // 5. Bloque de Patologías de Estado (Marquesinas)
+                xml += `    <EstRayones>${escapeXml(getVal('estRayones'))}</EstRayones>\n`;
+                xml += `    <EstRayonesDet>${escapeXml(getVal('estRayones_det'))}</EstRayonesDet>\n`;
+                xml += `    <EstGolpes>${escapeXml(getVal('estGolpes'))}</EstGolpes>\n`;
+                xml += `    <EstGolpesDet>${escapeXml(getVal('estGolpes_det'))}</EstGolpesDet>\n`;
+                xml += `    <EstGrafitis>${escapeXml(getVal('estGrafitis'))}</EstGrafitis>\n`;
+                xml += `    <EstGrafitisDet>${escapeXml(getVal('estGrafitis_det'))}</EstGrafitisDet>\n`;
+                xml += `    <EstFuncionamiento>${escapeXml(getVal('estFuncionamiento'))}</EstFuncionamiento>\n`;
+                xml += `    <EstFuncionamientoDet>${escapeXml(getVal('estFuncionamiento_det'))}</EstFuncionamientoDet>\n`;
+                xml += `    <EstInfo>${escapeXml(getVal('estInfo'))}</EstInfo>\n`;
+                xml += `    <EstInfoDet>${escapeXml(getVal('estInfo_det'))}</EstInfoDet>\n`;
+                xml += `    <EstLimpieza>${escapeXml(getVal('estLimpieza'))}</EstLimpieza>\n`;
+                xml += `    <EstLimpiezaObs>${escapeXml(getVal('estLimpieza_obs'))}</EstLimpiezaObs>\n`;
+                
+                // 6. Bloque Tótems (Checkboxes de Sí/No)
+                xml += `    <TotemDanioSin>${escapeXml(getVal('totemDanioSin'))}</TotemDanioSin>\n`;
+                xml += `    <TotemDanioRayones>${escapeXml(getVal('totemDanioRayones'))}</TotemDanioRayones>\n`;
+                xml += `    <TotemDanioGolpes>${escapeXml(getVal('totemDanioGolpes'))}</TotemDanioGolpes>\n`;
+                xml += `    <TotemDanioGrafitis>${escapeXml(getVal('totemDanioGrafitis'))}</TotemDanioGrafitis>\n`;
+                xml += `    <TotemDanioCorrosion>${escapeXml(getVal('totemDanioCorrosion'))}</TotemDanioCorrosion>\n`;
+                xml += `    <TotemDanioOtros>${escapeXml(getVal('totemDanioOtros'))}</TotemDanioOtros>\n`;
+                xml += `    <TotemDetalleOtros>${escapeXml(getVal('totemDetalleOtros'))}</TotemDetalleOtros>\n`;
+
+
+
+                xml += `    <SopDanyado>${escapeXml(getVal('sopDanyado'))}</SopDanyado>\n`;
+                xml += `    <SopEstable>${escapeXml(getVal('sopEstable'))}</SopEstable>\n`;
+                xml += `    <SopAnclaje>${escapeXml(getVal('sopAnclaje'))}</SopAnclaje>\n`;
+                
+                xml += `</FichaInspeccion>\n`;
+
+                // Forzar descarga del archivo estructurado XML
+                const nombreArchivo = `Mapeo_Word_${tipoActivo}_${getVal('municipio') || 'LEON'}.xml`;
+                const blob = new Blob([xml], { type: "text/xml;charset=utf-8" });
+                const link = document.createElement("a");
+                link.href = URL.createObjectURL(blob);
+                link.download = nombreArchivo;
+                document.body.appendChild(link);
+                link.click();
+                link.remove();
+            } catch (err) {
+                alert("Error generando el mapeo XML de campos.");
+            }
+        }
+
+      function generarFichaIndividualPDF() {
+    try {
+        // Inicializar jsPDF
+        const { jsPDF } = window.jspdf;
+        const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
+        const form = document.getElementById('inspectionForm');
+        const tipo = document.getElementById('elemTipo').value;
+
+        // 1. Recopilar todos los datos del formulario actual
+        let data = {};
+        Array.from(form.elements).forEach(el => {
+            if (el.id) {
+                data[el.id] = el.type === 'checkbox' ? (el.checked ? "SÍ" : "NO") : el.value;
+            }
+            if (el.type === 'radio' && el.checked) {
+                data[el.name] = el.value;
+            }
+        });
+
+        // Función auxiliar para obtener datos evitando "undefined"
+        const getVal = (id) => {
+            if (!data[id] || data[id] === "") return "---";
+            return data[id];
+        };
+
+        // --- DISEÑO DEL ENCABEZADO ---
+        // Banda azul superior corporativa
+        doc.setFillColor(30, 58, 138); // Azul oscuro
+        doc.rect(0, 0, 210, 26, 'F');
+        
+        doc.setTextColor(255, 255, 255);
+        doc.setFont("helvetica", "bold");
+        doc.setFontSize(16);
+        doc.text("ACTA TÉCNICA DE INSPECCIÓN", 105, 12, { align: "center" });
+        
+        doc.setFont("helvetica", "normal");
+        doc.setFontSize(10);
+        doc.text("Inspección de Transportes - Junta de Castilla y León", 105, 18, { align: "center" });
+
+        doc.setTextColor(100, 100, 100);
+        doc.setFontSize(9);
+        doc.text(`Fecha de emisión del informe: ${new Date().toLocaleDateString()}`, 14, 34);
+
+        // --- TABLA 1: DATOS DE IDENTIFICACIÓN ---
+        doc.autoTable({
+            startY: 38,
+            head: [[`Identificación del Activo: ${tipo}`, '']],
+            body: [
+                ['Nº de Referencia / ID', getVal('elemId')],
+                ['Nº de Serie', getVal('nSerie')],
+                ['Ubicación (Calle)', getVal('calle')],
+                ['Municipio y Provincia', `${getVal('municipio')} (${getVal('provincia')})`],
+                ['Coordenadas UTM (ETRS89)', `X: ${getVal('utmX')} / Y: ${getVal('utmY')}`],
+                ['Coordenadas Geográficas', `Lat: ${getVal('geoLat')} / Lng: ${getVal('geoLng')}`],
+                ['Fecha de Inspección', getVal('fechaInsp')],
+                ['Técnico Inspector', getVal('tecnico')]
+            ],
+            theme: 'grid',
+            headStyles: { fillColor: [37, 99, 235], fontSize: 11, fontStyle: 'bold' },
+            styles: { fontSize: 9, cellPadding: 4, textColor: [51, 65, 85] },
+            columnStyles: { 0: { fontStyle: 'bold', cellWidth: 65, fillColor: [248, 250, 252] } }
+        });
+
+        // --- TABLA 2: EVALUACIÓN TÉCNICA ---
+        let tablaEvaluacionBody = [];
+
+        if (tipo === 'MARQUESINA') {
+            tablaEvaluacionBody = [
+                ['Estructura / Soportes', getVal('inspEstructura'), getVal('inspEstructura_obs')],
+                ['Cubierta / Techo', getVal('inspTecho'), getVal('inspTecho_obs')],
+                ['Laterales / Paneles', getVal('inspPaneles'), getVal('inspPaneles_obs')],
+                ['Bancos / Soporte isquiático', getVal('inspBancos'), getVal('inspBancos_obs')],
+                ['Cristales', getVal('inspCristales'), getVal('inspCristales_obs')],
+                ['Iluminación', getVal('inspIluminacion'), getVal('inspIluminacion_obs')],
+                ['Señalización y cartelería', getVal('inspCarteleria'), getVal('inspCarteleria_obs')],
+                ['Limpieza General', getVal('estLimpieza'), getVal('estLimpieza_obs')]
+            ];
+            
+            // Añadir patologías si aplica
+            if(data['estRayones'] || data['estGolpes'] || data['estGrafitis']) {
+                tablaEvaluacionBody.push([{ content: 'Detección de Patologías', colSpan: 3, styles: { fontStyle: 'bold', fillColor: [226, 232, 240] } }]);
+                tablaEvaluacionBody.push(['Presencia de Rayones', getVal('estRayones'), getVal('estRayones_det')]);
+                tablaEvaluacionBody.push(['Golpes / Deformaciones', getVal('estGolpes'), getVal('estGolpes_det')]);
+                tablaEvaluacionBody.push(['Grafitis', getVal('estGrafitis'), getVal('estGrafitis_det')]);
+            }
+        } else {
+            // Formato para TÓTEM
+            tablaEvaluacionBody = [
+                ['Sin daños visibles', getVal('totemDanioSin'), '---'],
+                ['Rayones', getVal('totemDanioRayones'), '---'],
+                ['Golpes', getVal('totemDanioGolpes'), '---'],
+                ['Grafitis', getVal('totemDanioGrafitis'), '---'],
+                ['Corrosión', getVal('totemDanioCorrosion'), '---'],
+                ['Otros Daños', getVal('totemDanioOtros'), getVal('totemDetalleOtros')],
+                [{ content: 'Soporte Estructural', colSpan: 3, styles: { fontStyle: 'bold', fillColor: [226, 232, 240] } }],
+                ['Soporte Dañado', getVal('sopDanyado'), '---'],
+                ['Estructura Estable', getVal('sopEstable'), '---'],
+                ['Estado de Anclaje OK', getVal('sopAnclaje'), '---']
+            ];
+        }
+
+        doc.autoTable({
+            startY: doc.lastAutoTable.finalY + 8,
+            head: [['Elemento Inspeccionado', 'Estado', 'Observaciones / Detalles']],
+            body: tablaEvaluacionBody,
+            theme: 'grid',
+            headStyles: { fillColor: [37, 99, 235], fontSize: 10 },
+            styles: { fontSize: 9, cellPadding: 3, textColor: [51, 65, 85] },
+            columnStyles: { 
+                0: { fontStyle: 'bold', cellWidth: 70 },
+                1: { halign: 'center', cellWidth: 30 }
+            }
+        });
+
+        // --- TABLA 3: CONCLUSIONES Y RESULTADO GLOBAL ---
+        let dictamenFinal = getVal('conclusiones') !== "---" ? getVal('conclusiones') : "Sin observaciones adicionales registradas.";
+        let resultadoGlobal = getVal('resultadoInspeccion') !== "---" ? getVal('resultadoInspeccion') : "INSPECCIÓN COMPLETADA";
+
+        doc.autoTable({
+            startY: doc.lastAutoTable.finalY + 8,
+            head: [['Evaluación Global y Dictamen Técnico']],
+            body: [
+                [`RESULTADO: ${resultadoGlobal}`],
+                [dictamenFinal]
+            ],
+            theme: 'grid',
+            headStyles: { fillColor: [15, 23, 42], fontSize: 11 }, // Gris muy oscuro para contraste
+            styles: { fontSize: 9, cellPadding: 5 },
+            columnStyles: { 0: { cellWidth: 'wrap' } }
+        });
+
+        // --- PIE DE PÁGINA ---
+        const pageCount = doc.internal.getNumberOfPages();
+        doc.setFontSize(8);
+        doc.setTextColor(150, 150, 150);
+        for (let i = 1; i <= pageCount; i++) {
+            doc.setPage(i);
+            doc.text(`Sistema de Gestión BUSCYL - Página ${i} de ${pageCount}`, 105, 285, { align: 'center' });
+        }
+
+        // Descargar el documento
+        const nombreArchivo = `Acta_${tipo}_${getVal('municipio').replace(/\s+/g, '_')}_${getVal('fechaInsp')}.pdf`;
+        doc.save(nombreArchivo);
+
+    } catch (error) {
+        console.error("Fallo al generar PDF:", error);
+        alert("Error al generar el PDF. Asegúrate de que los datos del formulario son válidos y la librería jsPDF-AutoTable está cargada.");
+    }
+}
+
+     function generarInformeUbicacionesPDF() {
+    try {
+        if (!dbData || Object.keys(dbData).length === 0) { 
+            alert("No hay datos guardados para generar el informe."); 
+            return; 
+        }
+
+        const { jsPDF } = window.jspdf;
+        const doc = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'a4' });
+
+        // --- ENCABEZADO ---
+        doc.setFillColor(30, 58, 138); 
+        doc.rect(0, 0, 297, 26, 'F'); 
+        doc.setTextColor(255, 255, 255);
+        doc.setFont("helvetica", "bold");
+        doc.setFontSize(16);
+        doc.text("INFORME GENERAL DE UBICACIONES E INSPECCIONES", 148.5, 12, { align: "center" });
+
+        // --- PREPARACIÓN DE DATOS ---
+        const baseUrl = 'file:///C:/Users/JCOS.../Desktop/index4.html'; 
+
+        const tablaBody = Object.values(dbData).map(item => {
+            const url = (item.geoLat && item.geoLng) ? `${baseUrl}?lat=${item.geoLat}&lng=${item.geoLng}` : null;
+            const displayCoord = item.utmX && item.utmY ? `X: ${item.utmX}\nY: ${item.utmY}` : "---";
+            
+            return [
+                item.elemTipo || "---", 
+                item.municipio || "---", 
+                item.calle || "---", 
+                { content: displayCoord, link: url }, // autoTable reconoce la propiedad 'link'
+                item.fechaInsp || "---", 
+                item.tecnico || "---", 
+                item.resultadoInspeccion || (item.elemTipo === 'MARQUESINA' ? 'REVISADA' : '---')
+            ];
+        });
+
+        // --- RENDERIZADO DE LA TABLA ---
+        doc.autoTable({
+            startY: 45,
+            head: [['Tipo', 'Municipio', 'Dirección / Calle', 'Coordenadas UTM', 'Fecha Insp.', 'Técnico', 'Resultado Global']],
+            body: tablaBody,
+            theme: 'grid',
+            headStyles: { fillColor: [37, 99, 235], fontSize: 10, halign: 'center' },
+            styles: { fontSize: 8, cellPadding: 3, textColor: [51, 65, 85], valign: 'middle' },
+            columnStyles: {
+                0: { fontStyle: 'bold', halign: 'center', cellWidth: 25 },
+                3: { halign: 'center', cellWidth: 35, textColor: [0, 0, 255], fontStyle: 'bold' } // Azul para indicar enlace
+            },
+            // Solo dibujamos el área clicable, el texto lo pone autoTable automáticamente
+            didDrawCell: function(data) {
+                if (data.section === 'body' && data.column.index === 3 && data.cell.raw && data.cell.raw.link) {
+                    doc.link(data.cell.x, data.cell.y, data.cell.width, data.cell.height, { url: data.cell.raw.link });
+                }
+            },
+            didParseCell: function(data) {
+                if (data.section === 'body' && data.column.index === 6) {
+                    const texto = data.cell.raw ? data.cell.raw.toString().toUpperCase() : "";
+                    if (texto.includes('GRAVES') || texto.includes('❌')) data.cell.styles.textColor = [220, 38, 38];
+                    else if (texto.includes('LEVES') || texto.includes('⚠️')) data.cell.styles.textColor = [217, 119, 6];
+                    else if (texto.includes('CORRECTO') || texto.includes('✅')) data.cell.styles.textColor = [22, 163, 74];
+                }
+            }
+        });
+
+        doc.save(`Informe_General_${new Date().toISOString().split('T')[0]}.pdf`);
+    } catch (error) { 
+        console.error(error);
+        alert("Error al procesar PDF."); 
+    }
+}
+
+// Función para atrapar coordenadas enviadas desde el PDF
+function centrarMapaDesdeURL() {
+    const urlParams = new URLSearchParams(window.location.search);
+    const paramLat = urlParams.get('lat');
+    const paramLng = urlParams.get('lng');
+
+    if (paramLat && paramLng) {
+        const lat = parseFloat(paramLat);
+        const lng = parseFloat(paramLng);
+
+        // Hacemos que el mapa vuele a esa posición con zoom alto
+        map.setView([lat, lng], 19);
+
+        // Creamos una chincheta amarilla gigante y destacada
+        const iconDestacado = L.divIcon({
+            html: `<svg width="48" height="48" viewBox="0 0 24 24" fill="#eab308" stroke="black" stroke-width="2"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"></path><circle cx="12" cy="10" r="3" fill="black"></circle></svg>`,
+            className: 'custom-pin', iconSize: [48, 48], iconAnchor: [24, 48]
+        });
+
+        // La añadimos al mapa y le ponemos un mensaje
+        L.marker([lat, lng], {icon: iconDestacado, zIndexOffset: 2000})
+            .addTo(map)
+            .bindPopup("<b style='font-size:14px;'>📍 Punto seleccionado desde el PDF</b>")
+            .openPopup();
+    }
+}
+
+// Ejecutamos la función un segundo después de cargar la página 
+// para dar tiempo a que el mapa de Leaflet y los puntos base se hayan dibujado.
+window.addEventListener('load', function() {
+    setTimeout(centrarMapaDesdeURL, 1000);
+});
+
+
+
+    </script>
+</body>
+</html>
