@@ -280,10 +280,74 @@
             .modal-action-bar { width: 100%; justify-content: space-between; }
             .modal-container { height: 95vh; }
         }
+
+        /* ==========================================
+   PANEL DISCRETO DE USUARIO (ESTILO SAAS)
+   ========================================== */
+.user-profile-footer {
+    margin-top: auto; /* Empuja el contenedor automáticamente al fondo del sidebar */
+    padding-top: 16px;
+    border-top: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+}
+
+.user-profile-info {
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+}
+
+.user-profile-label {
+    font-size: 10px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: var(--text-muted);
+    margin-bottom: 2px;
+}
+
+.user-profile-email {
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--text-main);
+    white-space: nowrap;
+    text-overflow: ellipsis;
+    overflow: hidden;
+}
+
+.btn-logout-saas {
+    background: transparent;
+    border: none;
+    color: #ef4444;
+    font-size: 12px;
+    font-weight: 600;
+    cursor: pointer;
+    padding: 6px 10px;
+    border-radius: 6px;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    transition: all 0.2s ease;
+}
+
+.btn-logout-saas:hover {
+    background-color: #fef2f2;
+}
+
     </style>
+
+
+
+
+
+
+
 <script type="module">
   import { initializeApp } from "https://www.gstatic.com/firebasejs/9.22.0/firebase-app.js";
-  import { getAuth, signInWithEmailAndPassword, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/9.22.0/firebase-auth.js";
+  import { getAuth, signInWithEmailAndPassword, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/9.22.0/firebase-auth.js";
   import { getDatabase, ref, onValue, set, remove } from "https://www.gstatic.com/firebasejs/9.22.0/firebase-database.js";
 
   const firebaseConfig = {
@@ -306,8 +370,7 @@
   window.set = set;
   window.remove = remove;
 
-  // Función de carga de datos segura
- // Bandera de seguridad para que la ficha se abra solo 1 vez
+  // Bandera de seguridad para que la ficha se abra solo 1 vez
   let fichaUrlAbierta = false;
 
   // Función de carga de datos segura
@@ -328,7 +391,6 @@
               const lng = parseFloat(urlParams.get('lng'));
 
               if (!isNaN(lat) && !isNaN(lng)) {
-                  // Buscamos si existe un registro que coincida con esas coordenadas
                   const idEncontrado = Object.keys(window.dbData).find(id => {
                       const item = window.dbData[id];
                       return item && 
@@ -337,11 +399,9 @@
                   });
 
                   if (idEncontrado) {
-                      // Usamos un pequeño retardo para asegurar que todo el HTML está listo
                       setTimeout(() => {
                           abrirFormularioEditar(idEncontrado);
                           fichaUrlAbierta = true;
-                          // Limpiamos la URL para que no interfiera si recargas la página después
                           window.history.replaceState({}, document.title, window.location.pathname);
                       }, 500);
                   }
@@ -349,6 +409,7 @@
           }
       });
   };
+
   // Función de guardado integrada
   window.guardarDatosFirebase = function(idElemento, nuevosDatos) {
       const dbRef = window.ref(window.db, 'inspecciones_transporte/' + idElemento);
@@ -357,34 +418,67 @@
           .catch((error) => console.error("Error al guardar en Firebase:", error));
   };
 
-  // CONTROL DE SESIÓN CENTRALIZADO (Maneja la visibilidad de la pantalla aquí directamente)
+  // CONTROL DE SESIÓN CENTRALIZADO
   onAuthStateChanged(window.auth, (user) => {
       const modal = document.getElementById('login-modal');
+      const emailDisplay = document.getElementById('user-email-display');
+      
       if (user) {
           console.log("Sesión activa detectada para:", user.email);
           window.cargarDatosFirebase();
           
-          // Oculta el login directamente por ID para evitar fallos entre scripts
+          // Escribe el correo electrónico de forma limpia en el pie del panel lateral
+          if (emailDisplay) emailDisplay.innerText = user.email;
           if (modal) modal.style.display = 'none';
       } else {
           console.log("No hay sesión activa. Bloqueando pantalla con Login.");
+          // Limpia el texto del email e interactúa mostrando la pantalla de acceso
+          if (emailDisplay) emailDisplay.innerText = "---";
           if (modal) modal.style.display = 'flex';
       }
   });
 
-  // Ejecución del botón del formulario
+  // Ejecución del botón del formulario de login
   window.login = function(email, password) {
       signInWithEmailAndPassword(window.auth, email, password)
           .then((userCredential) => {
               console.log("Inicio de sesión manual correcto:", userCredential.user.email);
-              // No hace falta ocultar el modal aquí; 'onAuthStateChanged' lo detectará arriba y lo cerrará solo.
           })
           .catch((error) => {
               console.error("Error de autenticación:", error.code);
               alert("Error al acceder: " + error.message);
           });
   };
+
+  // NUEVA FUNCIÓN ENTERA: Desconexión de sesión en Firebase
+  window.logout = function() {
+      if (confirm("¿Estás seguro de que deseas cerrar sesión?")) {
+          signOut(window.auth)
+              .then(() => {
+                  console.log("Sesión finalizada con éxito.");
+                  if (typeof cerrarModal === 'function') cerrarModal(); 
+              })
+              .catch((error) => {
+                  console.error("Error al revocar la sesión:", error);
+                  alert("Error al desautenticar: " + error.message);
+              });
+      }
+  };
 </script>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 </head>
@@ -428,6 +522,18 @@
                 <button class="btn btn-pdf" onclick="generarInformeUbicacionesPDF()">📋 Generar Informe Ubicaciones (.PDF)</button>
                 <input type="file" id="importFile" style="display: none;" accept=".json" onchange="procesarImportacion(event)">
             </div>
+
+            <div class="user-profile-footer">
+                <div class="user-profile-info">
+                    <span class="user-profile-label">Usuario Conectado</span>
+                    <span id="user-email-display" class="user-profile-email">Cargando...</span>
+                </div>
+                <button type="button" class="btn-logout-saas" onclick="window.logout()" title="Cerrar sesión del sistema">
+                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path><polyline points="16 17 21 12 16 7"></polyline><line x1="21" y1="12" x2="9" y2="12"></line></svg>
+                    Salir
+                </button>
+            </div>
+        </div> </div>
         </div>
     </div>
 
