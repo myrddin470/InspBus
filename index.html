@@ -307,17 +307,48 @@
   window.remove = remove;
 
   // Función de carga de datos segura
+ // Bandera de seguridad para que la ficha se abra solo 1 vez
+  let fichaUrlAbierta = false;
+
+  // Función de carga de datos segura
   window.cargarDatosFirebase = function() {
       const dbRef = window.ref(window.db, 'inspecciones_transporte');
       window.onValue(dbRef, (snapshot) => {
           window.dbData = snapshot.val() || {};
           console.log("Datos cargados correctamente desde la nube.");
+          
           if (typeof window.renderizarPuntosExistentes === 'function') {
               window.renderizarPuntosExistentes();
           }
+
+          // === LÓGICA PARA ABRIR LA FICHA DE INSPECCIÓN ===
+          if (!fichaUrlAbierta) {
+              const urlParams = new URLSearchParams(window.location.search);
+              const lat = parseFloat(urlParams.get('lat'));
+              const lng = parseFloat(urlParams.get('lng'));
+
+              if (!isNaN(lat) && !isNaN(lng)) {
+                  // Buscamos si existe un registro que coincida con esas coordenadas
+                  const idEncontrado = Object.keys(window.dbData).find(id => {
+                      const item = window.dbData[id];
+                      return item && 
+                             Math.abs(parseFloat(item.geoLat) - lat) < 0.0001 && 
+                             Math.abs(parseFloat(item.geoLng) - lng) < 0.0001;
+                  });
+
+                  if (idEncontrado) {
+                      // Usamos un pequeño retardo para asegurar que todo el HTML está listo
+                      setTimeout(() => {
+                          abrirFormularioEditar(idEncontrado);
+                          fichaUrlAbierta = true;
+                          // Limpiamos la URL para que no interfiera si recargas la página después
+                          window.history.replaceState({}, document.title, window.location.pathname);
+                      }, 500);
+                  }
+              }
+          }
       });
   };
-
   // Función de guardado integrada
   window.guardarDatosFirebase = function(idElemento, nuevosDatos) {
       const dbRef = window.ref(window.db, 'inspecciones_transporte/' + idElemento);
@@ -494,8 +525,19 @@
 
         function toggleSidebar() { document.getElementById('sidebar').classList.toggle('open'); }
 
-        function initMap() {
-            map = L.map('map', { center: [42.599, -5.567], zoom: 15, zoomControl: false });
+     function initMap() {
+            // 1. Miramos la URL antes de crear el mapa
+            const urlParams = new URLSearchParams(window.location.search);
+            const lat = parseFloat(urlParams.get('lat'));
+            const lng = parseFloat(urlParams.get('lng'));
+
+            // 2. Si hay coordenadas válidas, centramos ahí con zoom 19. Si no, centro normal en León.
+            const centroFinal = (!isNaN(lat) && !isNaN(lng)) ? [lat, lng] : [42.599, -5.567];
+            const zoomFinal = (!isNaN(lat) && !isNaN(lng)) ? 19 : 15;
+
+            // 3. Creamos el mapa ya posicionado
+            map = L.map('map', { center: centroFinal, zoom: zoomFinal, zoomControl: false });
+            
             layers.road = L.tileLayer('https://mt1.google.com/vt/lyrs=m&hl=es&x={x}&y={y}&z={z}', { attribution: '© Google Maps', maxZoom: 21 }).addTo(map);
             layers.satellite = L.tileLayer('https://mt1.google.com/vt/lyrs=y&hl=es&x={x}&y={y}&z={z}', { attribution: '© Google Maps', maxZoom: 21 });
             map.on('click', function(e) { abrirFormularioNuevo(e.latlng.lat, e.latlng.lng); });
