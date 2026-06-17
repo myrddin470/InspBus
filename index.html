@@ -311,6 +311,11 @@
   let fichaUrlAbierta = false;
 
   // Función de carga de datos segura
+            // Función de carga de datos segura
+      
+
+
+// Función de carga de datos segura
   window.cargarDatosFirebase = function() {
       const dbRef = window.ref(window.db, 'inspecciones_transporte');
       window.onValue(dbRef, (snapshot) => {
@@ -320,35 +325,21 @@
           if (typeof window.renderizarPuntosExistentes === 'function') {
               window.renderizarPuntosExistentes();
           }
-
-          // === LÓGICA PARA ABRIR LA FICHA DE INSPECCIÓN ===
-          if (!fichaUrlAbierta) {
-              const urlParams = new URLSearchParams(window.location.search);
-              const lat = parseFloat(urlParams.get('lat'));
-              const lng = parseFloat(urlParams.get('lng'));
-
-              if (!isNaN(lat) && !isNaN(lng)) {
-                  // Buscamos si existe un registro que coincida con esas coordenadas
-                  const idEncontrado = Object.keys(window.dbData).find(id => {
-                      const item = window.dbData[id];
-                      return item && 
-                             Math.abs(parseFloat(item.geoLat) - lat) < 0.0001 && 
-                             Math.abs(parseFloat(item.geoLng) - lng) < 0.0001;
-                  });
-
-                  if (idEncontrado) {
-                      // Usamos un pequeño retardo para asegurar que todo el HTML está listo
-                      setTimeout(() => {
-                          abrirFormularioEditar(idEncontrado);
-                          fichaUrlAbierta = true;
-                          // Limpiamos la URL para que no interfiera si recargas la página después
-                          window.history.replaceState({}, document.title, window.location.pathname);
-                      }, 500);
-                  }
-              }
+          
+          // Forzar la comprobación del enlace del PDF en cuanto terminen de bajar las chinchetas
+          if (typeof centrarMapaDesdeURL === 'function') {
+              centrarMapaDesdeURL();
           }
       });
   };
+
+
+
+
+
+
+
+
   // Función de guardado integrada
   window.guardarDatosFirebase = function(idElemento, nuevosDatos) {
       const dbRef = window.ref(window.db, 'inspecciones_transporte/' + idElemento);
@@ -1315,10 +1306,11 @@ function configurarAvisoSalida() {
         doc.text("INFORME GENERAL DE UBICACIONES E INSPECCIONES", 148.5, 12, { align: "center" });
 
         // --- PREPARACIÓN DE DATOS ---
-        const baseUrl = 'https://myrddin470.github.io/InspBus/index.html'; 
+      const url = `web+buscyl://?lat=${lat}&lng=${lng}`;
 
         const tablaBody = Object.values(dbData).map(item => {
-            const url = (item.geoLat && item.geoLng) ? `${baseUrl}?lat=${item.geoLat}&lng=${item.geoLng}` : null;
+            // Genera el enlace directo para que Windows sepa que debe abrir tu App instalada
+            const url = (item.geoLat && item.geoLng) ? `web+buscyl://?lat=${item.geoLat}&lng=${item.geoLng}` : null;
             const displayCoord = item.utmX && item.utmY ? `X: ${item.utmX}\nY: ${item.utmY}` : "---";
             
             return [
@@ -1397,9 +1389,78 @@ function centrarMapaDesdeURL() {
 
 // Ejecutamos la función un segundo después de cargar la página 
 // para dar tiempo a que el mapa de Leaflet y los puntos base se hayan dibujado.
-window.addEventListener('load', function() {
+
+// --- NUEVA FUNCIÓN OPTIMIZADA PARA EL PROTOCOLO DEL PDF ---
+let urlProcesada = false; // Freno para que no entre en bucle
+
+function centrarMapaDesdeURL() {
+    if (urlProcesada) return;
+
+    // 1. Intentamos leer los parámetros normales de la URL (por si acaso)
+    const urlParams = new URLSearchParams(window.location.search);
+    let latParam = urlParams.get('lat');
+    let lngParam = urlParams.get('lng');
+
+    // 2. TU CÓDIGO NUEVO: Si venimos del enlace del PDF usando el protocolo personalizado
+    const pParam = urlParams.get('p');
+    if (pParam) {
+        try {
+            // Descodificamos el enlace interno que viene dentro de 'p'
+            const decodedUrl = decodeURIComponent(pParam);
+            const customParams = new URLSearchParams(decodedUrl.split('?')[1]);
+            
+            if (customParams.has('lat') && customParams.has('lng')) {
+                latParam = customParams.get('lat');
+                lngParam = customParams.get('lng');
+            }
+        } catch (error) {
+            console.error("Error al procesar el enlace del PDF:", error);
+        }
+    }
+
+    // 3. Si se han encontrado coordenadas válidas por cualquiera de los dos métodos
+    if (latParam && lngParam) {
+        const targetLat = parseFloat(latParam);
+        const targetLng = parseFloat(lngParam);
+
+        if (!isNaN(targetLat) && !isNaN(targetLng)) {
+            urlProcesada = true;
+
+            // Esperamos un instante corto para asegurar que la interfaz de Login ha desaparecido
+            setTimeout(() => {
+                if (map) {
+                    map.invalidateSize(); // Fuerza al mapa a recalcular sus dimensiones
+                    map.setView([targetLat, targetLng], 19); // Clava el zoom en la chincheta
+                }
+
+                // 4. Buscar la chincheta exacta descargada de Firebase para abrir su ficha modal
+                const datos = window.dbData || dbData;
+                if (datos) {
+                    const idEncontrado = Object.keys(datos).find(id => {
+                        const item = datos[id];
+                        return item && 
+                               Math.abs(parseFloat(item.geoLat) - targetLat) < 0.001 && 
+                               Math.abs(parseFloat(item.geoLng) - targetLng) < 0.001;
+                    });
+
+                    if (idEncontrado) {
+                        abrirFormularioEditar(idEncontrado); // Abre la ficha automáticamente
+                    }
+                }
+
+                // 5. Limpiar la URL de la barra de direcciones para que si pulsas F5 no vuelva a saltar
+                window.history.replaceState({}, document.title, window.location.pathname);
+
+            }, 400);
+        }
+    }
+}
+
+// Intentar centrar en la carga inicial por si los datos ya estuvieran listos
+window.addEventListener('load', () => {
     setTimeout(centrarMapaDesdeURL, 1000);
 });
+
 
 // --- SCRIPT GENERAL (Fuera del módulo) ---
 
