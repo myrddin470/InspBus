@@ -1197,122 +1197,127 @@ function configurarAvisoSalida() {
         // ==========================================
         //  NUEVA LÓGICA: GENERADOR DE XML CONSOLIDADO
         // ==========================================
-        function exportarFichaXMLParaWord() {
-            try {
-                const form = document.getElementById('inspectionForm');
-                const tipoActivo = document.getElementById('elemTipo').value;
-                
-                // Recopilar de forma segura todos los elementos del formulario abierto
-                let fData = {};
-                Array.from(form.elements).forEach(el => {
-                    if (el.id) {
-                        fData[el.id] = el.type === 'checkbox' ? (el.checked ? "SÍ" : "NO") : el.value;
-                    }
-                    if (el.type === 'radio' && el.checked) {
-                        fData[el.name] = el.value;
-                    }
-                });
-
-                // Helper para extraer campos dinámicos de texto u opciones que pudieran estar vacíos
-                const getVal = (id) => fData[id] || "";
-                const escapeXml = (str) => String(str).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&apos;');
-
-                // Construcción de la cadena XML plana y consolidada
-                let xml = `<?xml version="1.0" encoding="UTF-8"?>\n`;
-                xml += `<FichaInspeccion>\n`;
-                
-                // 1. Datos del Sistema Base e Identificación
-                xml += `    <ElemId>${escapeXml(document.getElementById('elemId').value)}</ElemId>\n`;
-                xml += `    <ElemTipo>${escapeXml(tipoActivo)}</ElemTipo>\n`;
-                xml += `    <NSerie>${escapeXml(getVal('nSerie') || "N/A")}</NSerie>\n`;
-                xml += `    <Calle>${escapeXml(getVal('calle'))}</Calle>\n`;
-                xml += `    <Municipio>${escapeXml(getVal('municipio'))}</Municipio>\n`;
-                xml += `    <Provincia>${escapeXml(getVal('provincia'))}</Provincia>\n`;
-                xml += `    <FechaInsp>${escapeXml(getVal('fechaInsp'))}</FechaInsp>\n`;
-                xml += `    <Tecnico>${escapeXml(getVal('tecnico'))}</Tecnico>\n`;
-                
-                // 2. Coordenadas y Ubicación Terrestre
-                xml += `    <GeoLat>${escapeXml(document.getElementById('geoLat').value)}</GeoLat>\n`;
-                xml += `    <GeoLng>${escapeXml(document.getElementById('geoLng').value)}</GeoLng>\n`;
-                xml += `    <UtmX>${escapeXml(document.getElementById('utmX').value)}</UtmX>\n`;
-                xml += `    <UtmY>${escapeXml(document.getElementById('utmY').value)}</UtmY>\n`;
-                
-                // 3. Resultados Generales
-                xml += `    <ResultadoInspeccion>${escapeXml(getVal('resultadoInspeccion') || (tipoActivo === 'MARQUESINA' ? 'REVISADO' : ''))}</ResultadoInspeccion>\n`;
-                xml += `    <Conclusiones>${escapeXml(getVal('conclusiones'))}</Conclusiones>\n`;
-                
-                // 4. Bloque Marquesinas (Radios de Estado + Observaciones de texto adjuntas)
-                xml += `    <InspEstructura>${escapeXml(getVal('inspEstructura'))}</InspEstructura>\n`;
-                xml += `    <InspEstructuraObs>${escapeXml(getVal('inspEstructura_obs'))}</InspEstructuraObs>\n`;
-                xml += `    <InspTecho>${escapeXml(getVal('inspTecho'))}</InspTecho>\n`;
-                xml += `    <InspTechoObs>${escapeXml(getVal('inspTecho_obs'))}</InspTechoObs>\n`;
-                xml += `    <InspPaneles>${escapeXml(getVal('inspPaneles'))}</InspPaneles>\n`;
-                xml += `    <InspPanelesObs>${escapeXml(getVal('inspPaneles_obs'))}</InspPanelesObs>\n`;
-                xml += `    <InspBancos>${escapeXml(getVal('inspBancos'))}</InspBancos>\n`;
-                xml += `    <InspBancosObs>${escapeXml(getVal('inspBancos_obs'))}</InspBancosObs>\n`;
-                xml += `    <InspCristales>${escapeXml(getVal('inspCristales'))}</InspCristales>\n`;
-                xml += `    <InspCristalesObs>${escapeXml(getVal('inspCristales_obs'))}</InspCristalesObs>\n`;
-                xml += `    <InspIluminacion>${escapeXml(getVal('inspIluminacion'))}</InspIluminacion>\n`;
-                xml += `    <InspIluminacionObs>${escapeXml(getVal('inspIluminacion_obs'))}</InspIluminacionObs>\n`;
-                xml += `    <InspPantallaSup>${escapeXml(getVal('inspPantallaSup'))}</InspPantallaSup>\n`;
-                xml += `    <InspPantallaSupObs>${escapeXml(getVal('inspPantallaSup_obs'))}</InspPantallaSupObs>\n`;
-                xml += `    <InspPantallaLat>${escapeXml(getVal('inspPantallaLat'))}</InspPantallaLat>\n`;
-                xml += `    <InspPantallaLatObs>${escapeXml(getVal('inspPantallaLat_obs'))}</InspPantallaLatObs>\n`;
-                xml += `    <InspPantallaInt>${escapeXml(getVal('inspPantallaInt'))}</InspPantallaInt>\n`;
-                xml += `    <InspPantallaIntObs>${escapeXml(getVal('inspPantallaInt_obs'))}</InspPantallaIntObs>\n`;
-                xml += `    <InspNfc>${escapeXml(getVal('inspNfc'))}</InspNfc>\n`;
-                xml += `    <InspNfcObs>${escapeXml(getVal('inspNfc_obs'))}</InspNfcObs>\n`;
-                xml += `    <InspPublicidad>${escapeXml(getVal('inspPublicidad'))}</InspPublicidad>\n`;
-                xml += `    <InspPublicidadObs>${escapeXml(getVal('inspPublicidad_obs'))}</InspPublicidadObs>\n`;
-                xml += `    <InspCarteleria>${escapeXml(getVal('inspCarteleria'))}</InspCarteleria>\n`;
-                xml += `    <InspCarteleriaObs>${escapeXml(getVal('inspCarteleria_obs'))}</InspCarteleriaObs>\n`;
-                xml += `    <InspAnclajes>${escapeXml(getVal('inspAnclajes'))}</InspAnclajes>\n`;
-                xml += `    <InspAnclajesObs>${escapeXml(getVal('inspAnclajes_obs'))}</InspAnclajesObs>\n`;
-                
-                // 5. Bloque de Patologías de Estado (Marquesinas)
-                xml += `    <EstRayones>${escapeXml(getVal('estRayones'))}</EstRayones>\n`;
-                xml += `    <EstRayonesDet>${escapeXml(getVal('estRayones_det'))}</EstRayonesDet>\n`;
-                xml += `    <EstGolpes>${escapeXml(getVal('estGolpes'))}</EstGolpes>\n`;
-                xml += `    <EstGolpesDet>${escapeXml(getVal('estGolpes_det'))}</EstGolpesDet>\n`;
-                xml += `    <EstGrafitis>${escapeXml(getVal('estGrafitis'))}</EstGrafitis>\n`;
-                xml += `    <EstGrafitisDet>${escapeXml(getVal('estGrafitis_det'))}</EstGrafitisDet>\n`;
-                xml += `    <EstFuncionamiento>${escapeXml(getVal('estFuncionamiento'))}</EstFuncionamiento>\n`;
-                xml += `    <EstFuncionamientoDet>${escapeXml(getVal('estFuncionamiento_det'))}</EstFuncionamientoDet>\n`;
-                xml += `    <EstInfo>${escapeXml(getVal('estInfo'))}</EstInfo>\n`;
-                xml += `    <EstInfoDet>${escapeXml(getVal('estInfo_det'))}</EstInfoDet>\n`;
-                xml += `    <EstLimpieza>${escapeXml(getVal('estLimpieza'))}</EstLimpieza>\n`;
-                xml += `    <EstLimpiezaObs>${escapeXml(getVal('estLimpieza_obs'))}</EstLimpiezaObs>\n`;
-                
-                // 6. Bloque Tótems (Checkboxes de Sí/No)
-                xml += `    <TotemDanioSin>${escapeXml(getVal('totemDanioSin'))}</TotemDanioSin>\n`;
-                xml += `    <TotemDanioRayones>${escapeXml(getVal('totemDanioRayones'))}</TotemDanioRayones>\n`;
-                xml += `    <TotemDanioGolpes>${escapeXml(getVal('totemDanioGolpes'))}</TotemDanioGolpes>\n`;
-                xml += `    <TotemDanioGrafitis>${escapeXml(getVal('totemDanioGrafitis'))}</TotemDanioGrafitis>\n`;
-                xml += `    <TotemDanioCorrosion>${escapeXml(getVal('totemDanioCorrosion'))}</TotemDanioCorrosion>\n`;
-                xml += `    <TotemDanioOtros>${escapeXml(getVal('totemDanioOtros'))}</TotemDanioOtros>\n`;
-                xml += `    <TotemDetalleOtros>${escapeXml(getVal('totemDetalleOtros'))}</TotemDetalleOtros>\n`;
+       
 
 
-
-                xml += `    <SopDanyado>${escapeXml(getVal('sopDanyado'))}</SopDanyado>\n`;
-                xml += `    <SopEstable>${escapeXml(getVal('sopEstable'))}</SopEstable>\n`;
-                xml += `    <SopAnclaje>${escapeXml(getVal('sopAnclaje'))}</SopAnclaje>\n`;
-                
-                xml += `</FichaInspeccion>\n`;
-
-                // Forzar descarga del archivo estructurado XML
-                const nombreArchivo = `Mapeo_Word_${tipoActivo}_${getVal('municipio') || 'LEON'}.xml`;
-                const blob = new Blob([xml], { type: "text/xml;charset=utf-8" });
-                const link = document.createElement("a");
-                link.href = URL.createObjectURL(blob);
-                link.download = nombreArchivo;
-                document.body.appendChild(link);
-                link.click();
-                link.remove();
-            } catch (err) {
-                alert("Error generando el mapeo XML de campos.");
+function exportarFichaXMLParaWord() {
+    try {
+        const form = document.getElementById('inspectionForm');
+        const tipoActivo = document.getElementById('elemTipo').value;
+        
+        // Recopilar de forma segura todos los elementos del formulario
+        let fData = {};
+        Array.from(form.elements).forEach(el => {
+            if (el.id) {
+                fData[el.id] = el.type === 'checkbox' ? (el.checked ? "SÍ" : "NO") : el.value;
             }
-        }
+            if (el.type === 'radio' && el.checked) {
+                fData[el.name] = el.value;
+            }
+        });
+
+        const getVal = (id) => fData[id] || "";
+        const escapeXml = (str) => String(str).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&apos;');
+
+        // Construcción del XML
+        let xml = `<?xml version="1.0" encoding="UTF-8"?>\n<FichaInspeccion>\n`;
+        
+        // ... (Tu bloque de XML sigue igual) ...
+        xml += `    <ElemId>${escapeXml(document.getElementById('elemId').value)}</ElemId>\n`;
+        xml += `    <ElemTipo>${escapeXml(tipoActivo)}</ElemTipo>\n`;
+        xml += `    <NSerie>${escapeXml(getVal('nSerie') || "N/A")}</NSerie>\n`;
+        xml += `    <Calle>${escapeXml(getVal('calle'))}</Calle>\n`;
+        xml += `    <Municipio>${escapeXml(getVal('municipio'))}</Municipio>\n`;
+        xml += `    <Provincia>${escapeXml(getVal('provincia'))}</Provincia>\n`;
+        xml += `    <FechaInsp>${escapeXml(getVal('fechaInsp'))}</FechaInsp>\n`;
+        xml += `    <Tecnico>${escapeXml(getVal('tecnico'))}</Tecnico>\n`;
+        xml += `    <GeoLat>${escapeXml(document.getElementById('geoLat').value)}</GeoLat>\n`;
+        xml += `    <GeoLng>${escapeXml(document.getElementById('geoLng').value)}</GeoLng>\n`;
+        xml += `    <UtmX>${escapeXml(document.getElementById('utmX').value)}</UtmX>\n`;
+        xml += `    <UtmY>${escapeXml(document.getElementById('utmY').value)}</UtmY>\n`;
+        xml += `    <ResultadoInspeccion>${escapeXml(getVal('resultadoInspeccion') || (tipoActivo === 'MARQUESINA' ? 'REVISADO' : ''))}</ResultadoInspeccion>\n`;
+        xml += `    <Conclusiones>${escapeXml(getVal('conclusiones'))}</Conclusiones>\n`;
+        
+        // Bloque Marquesinas y Tótems (mantenemos tu estructura interna)
+        xml += `    <InspEstructura>${escapeXml(getVal('inspEstructura'))}</InspEstructura>\n`;
+        xml += `    <InspEstructuraObs>${escapeXml(getVal('inspEstructura_obs'))}</InspEstructuraObs>\n`;
+        xml += `    <InspTecho>${escapeXml(getVal('inspTecho'))}</InspTecho>\n`;
+        xml += `    <InspTechoObs>${escapeXml(getVal('inspTecho_obs'))}</InspTechoObs>\n`;
+        xml += `    <InspPaneles>${escapeXml(getVal('inspPaneles'))}</InspPaneles>\n`;
+        xml += `    <InspPanelesObs>${escapeXml(getVal('inspPaneles_obs'))}</InspPanelesObs>\n`;
+        xml += `    <InspBancos>${escapeXml(getVal('inspBancos'))}</InspBancos>\n`;
+        xml += `    <InspBancosObs>${escapeXml(getVal('inspBancos_obs'))}</InspBancosObs>\n`;
+        xml += `    <InspCristales>${escapeXml(getVal('inspCristales'))}</InspCristales>\n`;
+        xml += `    <InspCristalesObs>${escapeXml(getVal('inspCristales_obs'))}</InspCristalesObs>\n`;
+        xml += `    <InspIluminacion>${escapeXml(getVal('inspIluminacion'))}</InspIluminacion>\n`;
+        xml += `    <InspIluminacionObs>${escapeXml(getVal('inspIluminacion_obs'))}</InspIluminacionObs>\n`;
+        xml += `    <InspPantallaSup>${escapeXml(getVal('inspPantallaSup'))}</InspPantallaSup>\n`;
+        xml += `    <InspPantallaSupObs>${escapeXml(getVal('inspPantallaSup_obs'))}</InspPantallaSupObs>\n`;
+        xml += `    <InspPantallaLat>${escapeXml(getVal('inspPantallaLat'))}</InspPantallaLat>\n`;
+        xml += `    <InspPantallaLatObs>${escapeXml(getVal('inspPantallaLat_obs'))}</InspPantallaLatObs>\n`;
+        xml += `    <InspPantallaInt>${escapeXml(getVal('inspPantallaInt'))}</InspPantallaInt>\n`;
+        xml += `    <InspPantallaIntObs>${escapeXml(getVal('inspPantallaInt_obs'))}</InspPantallaIntObs>\n`;
+        xml += `    <InspNfc>${escapeXml(getVal('inspNfc'))}</InspNfc>\n`;
+        xml += `    <InspNfcObs>${escapeXml(getVal('inspNfc_obs'))}</InspNfcObs>\n`;
+        xml += `    <InspPublicidad>${escapeXml(getVal('inspPublicidad'))}</InspPublicidad>\n`;
+        xml += `    <InspPublicidadObs>${escapeXml(getVal('inspPublicidad_obs'))}</InspPublicidadObs>\n`;
+        xml += `    <InspCarteleria>${escapeXml(getVal('inspCarteleria'))}</InspCarteleria>\n`;
+        xml += `    <InspCarteleriaObs>${escapeXml(getVal('inspCarteleria_obs'))}</InspCarteleriaObs>\n`;
+        xml += `    <InspAnclajes>${escapeXml(getVal('inspAnclajes'))}</InspAnclajes>\n`;
+        xml += `    <InspAnclajesObs>${escapeXml(getVal('inspAnclajes_obs'))}</InspAnclajesObs>\n`;
+        xml += `    <EstRayones>${escapeXml(getVal('estRayones'))}</EstRayones>\n`;
+        xml += `    <EstRayonesDet>${escapeXml(getVal('estRayones_det'))}</EstRayonesDet>\n`;
+        xml += `    <EstGolpes>${escapeXml(getVal('estGolpes'))}</EstGolpes>\n`;
+        xml += `    <EstGolpesDet>${escapeXml(getVal('estGolpes_det'))}</EstGolpesDet>\n`;
+        xml += `    <EstGrafitis>${escapeXml(getVal('estGrafitis'))}</EstGrafitis>\n`;
+        xml += `    <EstGrafitisDet>${escapeXml(getVal('estGrafitis_det'))}</EstGrafitisDet>\n`;
+        xml += `    <EstFuncionamiento>${escapeXml(getVal('estFuncionamiento'))}</EstFuncionamiento>\n`;
+        xml += `    <EstFuncionamientoDet>${escapeXml(getVal('estFuncionamiento_det'))}</EstFuncionamientoDet>\n`;
+        xml += `    <EstInfo>${escapeXml(getVal('estInfo'))}</EstInfo>\n`;
+        xml += `    <EstInfoDet>${escapeXml(getVal('estInfo_det'))}</EstInfoDet>\n`;
+        xml += `    <EstLimpieza>${escapeXml(getVal('estLimpieza'))}</EstLimpieza>\n`;
+        xml += `    <EstLimpiezaObs>${escapeXml(getVal('estLimpieza_obs'))}</EstLimpiezaObs>\n`;
+        xml += `    <TotemDanioSin>${escapeXml(getVal('totemDanioSin'))}</TotemDanioSin>\n`;
+        xml += `    <TotemDanioRayones>${escapeXml(getVal('totemDanioRayones'))}</TotemDanioRayones>\n`;
+        xml += `    <TotemDanioGolpes>${escapeXml(getVal('totemDanioGolpes'))}</TotemDanioGolpes>\n`;
+        xml += `    <TotemDanioGrafitis>${escapeXml(getVal('totemDanioGrafitis'))}</TotemDanioGrafitis>\n`;
+        xml += `    <TotemDanioCorrosion>${escapeXml(getVal('totemDanioCorrosion'))}</TotemDanioCorrosion>\n`;
+        xml += `    <TotemDanioOtros>${escapeXml(getVal('totemDanioOtros'))}</TotemDanioOtros>\n`;
+        xml += `    <TotemDetalleOtros>${escapeXml(getVal('totemDetalleOtros'))}</TotemDetalleOtros>\n`;
+        xml += `    <SopDanyado>${escapeXml(getVal('sopDanyado'))}</SopDanyado>\n`;
+        xml += `    <SopEstable>${escapeXml(getVal('sopEstable'))}</SopEstable>\n`;
+        xml += `    <SopAnclaje>${escapeXml(getVal('sopAnclaje'))}</SopAnclaje>\n`;
+        xml += `</FichaInspeccion>\n`;
+
+        // LÓGICA DE NOMBRE DINÁMICO: TIPO_CALLE_POBLACION
+        const rawCalle = getVal('calle') || "Sin_Calle";
+        const rawPoblacion = getVal('municipio') || "Sin_Municipio";
+        
+        // Limpiamos caracteres prohibidos y reemplazamos espacios por guiones bajos
+        const limpiar = (str) => str.replace(/[\/\\*?:"<>|]/g, '').replace(/\s+/g, '_');
+        const nombreArchivo = `${limpiar(tipoActivo)}_${limpiar(rawCalle)}_${limpiar(rawPoblacion)}.xml`;
+
+        // Descarga
+        const blob = new Blob([xml], { type: "text/xml;charset=utf-8" });
+        const link = document.createElement("a");
+        link.href = URL.createObjectURL(blob);
+        link.download = nombreArchivo;
+        document.body.appendChild(link);
+        link.click();
+        link.remove();
+    } catch (err) {
+        alert("Error generando el archivo XML para Word.");
+    }
+}
+
+
+
+
+
+
+
+
+
 
       function generarFichaIndividualPDF() {
     try {
