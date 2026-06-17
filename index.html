@@ -525,23 +525,85 @@
 
         function toggleSidebar() { document.getElementById('sidebar').classList.toggle('open'); }
 
-     function initMap() {
-            // 1. Miramos la URL antes de crear el mapa
-            const urlParams = new URLSearchParams(window.location.search);
-            const lat = parseFloat(urlParams.get('lat'));
-            const lng = parseFloat(urlParams.get('lng'));
+   
 
-            // 2. Si hay coordenadas válidas, centramos ahí con zoom 19. Si no, centro normal en León.
-            const centroFinal = (!isNaN(lat) && !isNaN(lng)) ? [lat, lng] : [42.599, -5.567];
-            const zoomFinal = (!isNaN(lat) && !isNaN(lng)) ? 19 : 15;
+function initMap() {
+    // 1. Miramos la URL antes de crear el mapa
+    const urlParams = new URLSearchParams(window.location.search);
+    const lat = parseFloat(urlParams.get('lat'));
+    const lng = parseFloat(urlParams.get('lng'));
 
-            // 3. Creamos el mapa ya posicionado
-            map = L.map('map', { center: centroFinal, zoom: zoomFinal, zoomControl: false });
-            
-            layers.road = L.tileLayer('https://mt1.google.com/vt/lyrs=m&hl=es&x={x}&y={y}&z={z}', { attribution: '© Google Maps', maxZoom: 21 }).addTo(map);
-            layers.satellite = L.tileLayer('https://mt1.google.com/vt/lyrs=y&hl=es&x={x}&y={y}&z={z}', { attribution: '© Google Maps', maxZoom: 21 });
-            map.on('click', function(e) { abrirFormularioNuevo(e.latlng.lat, e.latlng.lng); });
-        }
+    // 2. Si hay coordenadas válidas, centramos ahí con zoom 19. Si no, centro normal en León.
+    const centroFinal = (!isNaN(lat) && !isNaN(lng)) ? [lat, lng] : [42.599, -5.567];
+    const zoomFinal = (!isNaN(lat) && !isNaN(lng)) ? 19 : 15;
+
+    // 3. Creamos el mapa ya posicionado
+    map = L.map('map', { center: centroFinal, zoom: zoomFinal, zoomControl: false });
+    
+    layers.road = L.tileLayer('https://mt1.google.com/vt/lyrs=m&hl=es&x={x}&y={y}&z={z}', { attribution: '© Google Maps', maxZoom: 21 }).addTo(map);
+    layers.satellite = L.tileLayer('https://mt1.google.com/vt/lyrs=y&hl=es&x={x}&y={y}&z={z}', { attribution: '© Google Maps', maxZoom: 21 });
+    
+    // NUEVO MODAL INTEGRADO EN EL PUNTO DE CLIC DEL RATÓN
+    map.on('click', function(e) { 
+        const clickLat = e.latlng.lat;
+        const clickLng = e.latlng.lng;
+
+        // Creamos dinámicamente la estructura del cartelito flotante
+        const contenedorPopup = document.createElement('div');
+        contenedorPopup.style.fontFamily = "'Inter', sans-serif";
+        contenedorPopup.style.padding = "4px";
+        contenedorPopup.style.textAlign = "center";
+        
+        contenedorPopup.innerHTML = `
+            <p style="margin: 0 0 12px 0; font-size: 14px; font-weight: 600; color: #1e293b; line-height: 1.4;">
+                ¿Deseas fijar una nueva<br>marquesina o tótem aquí?
+            </p>
+            <div style="display: flex; gap: 8px; justify-content: center;">
+                <button id="btn-popup-si" style="background-color: #2563eb; color: white; border: none; padding: 6px 14px; border-radius: 6px; font-size: 13px; font-weight: 600; cursor: pointer; transition: background 0.2s;">
+                    Sí, crear
+                </button>
+                <button id="btn-popup-no" style="background-color: #f1f5f9; color: #475569; border: none; padding: 6px 14px; border-radius: 6px; font-size: 13px; font-weight: 600; cursor: pointer;">
+                    No
+                </button>
+            </div>
+        `;
+
+        // Generamos el elemento Popup nativo de Leaflet pegado a la chincheta imaginaria
+        const popupPregunta = L.popup({
+            closeButton: false, 
+            offset: [0, -5],
+            minWidth: 200
+        })
+        .setLatLng(e.latlng)
+        .setContent(contenedorPopup)
+        .openOn(map);
+
+        // Evento para el botón SI: Cierra este cartelito y despliega tu formulario modal de siempre
+        contenedorPopup.querySelector('#btn-popup-si').addEventListener('click', function() {
+            map.closePopup(); 
+            abrirFormularioNuevo(clickLat, clickLng); 
+        });
+
+        // Evento para el botón NO: Simplemente desvanece el cartelito sin hacer nada más
+        contenedorPopup.querySelector('#btn-popup-no').addEventListener('click', function() {
+            map.closePopup(); 
+        });
+    });
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
         function toggleMapLayer() {
             if (currentLayer === 'road') {
