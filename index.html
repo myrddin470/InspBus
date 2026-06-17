@@ -1368,6 +1368,60 @@ function configurarAvisoSalida() {
 }
 
 // Función para atrapar coordenadas enviadas desde el PDF
+// ==========================================
+// CANAL DE COMUNICACIÓN ENTRE PESTAÑAS (PDF a WEB/APP)
+// ==========================================
+const appChannel = new BroadcastChannel('buscyl_app_channel');
+
+// 1. ESCUCHAR SI SOMOS LA PESTAÑA PRINCIPAL: Otra pestaña nueva nos manda coordenadas
+appChannel.onmessage = (event) => {
+    if (event.data.type === 'MOVER_MAPA') {
+        // Confirmamos de inmediato a la pestaña nueva que ya estamos aquí activos
+        appChannel.postMessage({ type: 'RECIBIDO' });
+        
+        const targetLat = event.data.lat;
+        const targetLng = event.data.lng;
+
+        // Centramos el mapa principal con el zoom de detalle (19)
+        if (typeof map !== 'undefined') {
+            map.setView([targetLat, targetLng], 19);
+        }
+        
+        // Buscamos el punto en el mapa para abrir su ficha/popup
+        buscarYFocarMarcador(targetLat, targetLng);
+        
+        // Forzamos el foco del navegador hacia esta pestaña principal
+        window.focus(); 
+    }
+};
+
+// FUNCIÓN AUXILIAR: Busca el marcador por coordenadas exactas y lo activa
+function buscarYFocarMarcador(targetLat, targetLng) {
+    // Intento 1: Si usas 'capaMarcadores' como un LayerGroup de Leaflet
+    if (typeof capaMarcadores !== 'undefined' && typeof capaMarcadores.eachLayer === 'function') {
+        capaMarcadores.eachLayer(function (layer) {
+            const pos = layer.getLatLng();
+            if (Math.abs(pos.lat - targetLat) < 0.00001 && Math.abs(pos.lng - targetLng) < 0.00001) {
+                if (typeof layer.openPopup === 'function') layer.openPopup();
+                layer.fire('click'); // Dispara tu evento para abrir el formulario modal
+            }
+        });
+    }
+    // Intento 2: Si buscas sobre el array plano 'marcadoresGrupo' de tu index.html
+    else if (typeof marcadoresGrupo !== 'undefined' && Array.isArray(marcadoresGrupo)) {
+        marcadoresGrupo.forEach(function (layer) {
+            if (layer && typeof layer.getLatLng === 'function') {
+                const pos = layer.getLatLng();
+                if (Math.abs(pos.lat - targetLat) < 0.00001 && Math.abs(pos.lng - targetLng) < 0.00001) {
+                    if (typeof layer.openPopup === 'function') layer.openPopup();
+                    layer.fire('click'); // Dispara tu evento para abrir el formulario modal
+                }
+            }
+        });
+    }
+}
+
+// 2. FUNCIÓN PRINCIPAL: Controla la URL y evita duplicar pestañas de la aplicación
 function centrarMapaDesdeURL() {
     const urlParams = new URLSearchParams(window.location.search);
     const paramLat = urlParams.get('lat');
@@ -1377,21 +1431,46 @@ function centrarMapaDesdeURL() {
         const targetLat = parseFloat(paramLat);
         const targetLng = parseFloat(paramLng);
 
-        // 1. Centramos el mapa en las coordenadas recibidas con zoom de detalle (19)
-        map.setView([targetLat, targetLng], 19);
+        // Emitimos la ubicación al canal por si la aplicación ya está abierta en otra pestaña
+        appChannel.postMessage({ type: 'MOVER_MAPA', lat: targetLat, lng: targetLng });
 
-        // 2. Buscamos entre tus marcadores existentes para abrir su popup
-        // (Esto asume que tienes tus marcadores guardados en una capa llamada 'capaMarcadores' o similar)
-        // Si usas una capa de Leaflet, hacemos esto:
-        if (typeof capaMarcadores !== 'undefined') {
-            capaMarcadores.eachLayer(function (layer) {
-                const pos = layer.getLatLng();
-                // Comparamos con una pequeña tolerancia (0.00001) para encontrar el punto exacto
-                if (Math.abs(pos.lat - targetLat) < 0.00001 && Math.abs(pos.lng - targetLng) < 0.00001) {
-                    layer.openPopup(); // Abre el popup del punto existente
+        let contestado = false;
+        
+        // Escuchamos si la pestaña principal nos responde diciendo "¡estoy aquí!"
+        const checkRespuesta = (e) => {
+            if (e.data.type === 'RECIBIDO') {
+                contestado = true;
+                appChannel.removeEventListener('message', checkRespuesta);
+                
+                // Como la otra pestaña ya capturó las coordenadas, cerramos esta de inmediato
+                window.close();
+                
+                // Pantalla de seguridad/confirmación limpia por si el navegador bloquea el auto-cierre
+                document.body.innerHTML = `
+                    <div style="display:flex; height:100vh; background:#0f172a; color:white; align-items:center; justify-content:center; text-align:center; font-family:sans-serif; flex-direction:column; padding: 20px;">
+                        <svg width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="#10b981" stroke-width="2" style="margin-bottom:16px;"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path><polyline points="22 4 12 14.01 9 11.01"></polyline></svg>
+                        <h2 style="font-size:20px; font-weight:600;">Ubicación enviada a la pestaña activa</h2>
+                        <p style="color:#94a3b8; margin-top:8px; font-size:14px;">Ya tienes la aplicación abierta en otro lado. Puedes cerrar esta ventana con seguridad.</p>
+                    </div>
+                `;
+            }
+        };
+        appChannel.addEventListener('message', checkRespuesta);
+
+        // Damos un margen de 200ms. Si nadie responde en ese tiempo, significa que somos la primera/única pestaña abierta
+        setTimeout(() => {
+            if (!contestado) {
+                appChannel.removeEventListener('message', checkRespuesta);
+                
+                // Centramos nuestro propio mapa local
+                if (typeof map !== 'undefined') {
+                    map.setView([targetLat, targetLng], 19);
                 }
-            });
-        }
+                
+                // Buscamos de forma local el marcador para abrirlo
+                buscarYFocarMarcador(targetLat, targetLng);
+            }
+        }, 200);
     }
 }
 
