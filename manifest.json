@@ -1,7 +1,7 @@
 {
   "name": "MARQUESINAS BUSCYL",
   "short_name": "BUSCYL",
-  "description": "Sistema de gestión e inspección de transportes de Castilla y León",
+  "description": "Sistema de gestión e inspection de transportes de Castilla y León",
   "start_url": "./index.html",
   "display": "standalone",
   "background_color": "#0f172a",
@@ -23,5 +23,11 @@
   ],
   "launch_handler": {
     "client_mode": "navigate-existing"
-  }
+  },
+  "protocol_handlers": [
+    {
+      "protocol": "web+buscyl",
+      "url": "./index.html?p=%s"
+    }
+  ]
 }
