@@ -1,0 +1,876 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Mapa de Posiciones Inspección de Transportes León</title>
+    
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+    
+    <style>
+        :root {
+            --primary-color: #1a73e8;
+            --danger-color: #d93025;
+            --success-color: #1e8e3e;
+            --sidebar-bg: rgba(255, 255, 255, 0.96);
+        }
+
+        body, html {
+            margin: 0;
+            padding: 0;
+            height: 100%;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            overflow: hidden;
+        }
+
+        #map {
+            height: 100vh;
+            width: 100vw;
+            z-index: 1;
+        }
+
+        /* Título Superior Estilo Google Maps */
+        /* Título Superior Estilo Google Maps */
+        .app-header {
+            position: absolute;
+            top: 15px;
+            right: 100px; /* <--- CAMBIADO: Antes era left: 50% */
+            /* transform: translateX(-50%); <--- ELIMINADO/COMENTADO: Ya no queremos centrarlo */
+            z-index: 1000;
+            background: white;
+            padding: 12px 30px;
+            border-radius: 25px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.25);
+            font-weight: 700;
+            color: #202124;
+            text-transform: uppercase;
+            letter-spacing: 1.2px;
+            pointer-events: none;
+            font-size: 14px;
+            text-align: center;
+            border: 1px solid #dadce0;
+        }
+
+        /* Barra Lateral Flotante */
+        .sidebar {
+            position: absolute;
+            top: 15px;
+            left: 15px;
+            width: 390px;
+            background: var(--sidebar-bg);
+            z-index: 1000;
+            border-radius: 8px;
+            box-shadow: 0 2px 6px rgba(0,0,0,0.3);
+            padding: 20px;
+            max-height: 95vh;
+            display: flex;
+            flex-direction: column;
+            border: 1px solid #dadce0;
+        }
+
+        .input-group {
+            margin-bottom: 12px;
+        }
+
+        label {
+            display: block;
+            font-size: 11px;
+            color: #5f6368;
+            margin-bottom: 6px;
+            font-weight: 700;
+            letter-spacing: 0.5px;
+        }
+
+        input {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid #dadce0;
+            border-radius: 4px;
+            box-sizing: border-box;
+            font-size: 14px;
+            margin-bottom: 10px;
+            color: #202124;
+        }
+
+        input:focus {
+            outline: none;
+            border-color: var(--primary-color);
+            box-shadow: 0 0 0 2px rgba(26,115,232,0.2);
+        }
+
+        /* Contenedores de botones */
+        .btn-container {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 8px;
+            margin-bottom: 8px;
+        }
+
+        button {
+            padding: 10px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-weight: 600;
+            font-size: 12px;
+            transition: background 0.2s, box-shadow 0.2s;
+        }
+
+        .btn-add {
+            background-color: var(--primary-color);
+            color: white;
+            grid-column: span 2;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+            font-size: 13px;
+            padding: 12px;
+        }
+        .btn-add:hover { background-color: #1557b0; }
+
+        .btn-undo { background-color: #f1f3f4; color: #3c4043; }
+        .btn-undo:hover { background-color: #e8eaed; }
+
+        .btn-reset { background-color: #fce8e6; color: var(--danger-color); }
+        .btn-reset:hover { background-color: #f9d2ce; }
+
+        .btn-export { background-color: #e6f4ea; color: var(--success-color); }
+        .btn-export:hover { background-color: #ceead6; }
+
+        .btn-import { background-color: #e8f0fe; color: var(--primary-color); }
+        .btn-import:hover { background-color: #d2e3fc; }
+
+        .btn-print {
+            background-color: #202124;
+            color: white;
+            grid-column: span 2;
+            font-size: 13px;
+            padding: 11px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.2);
+        }
+        .btn-print:hover { background-color: #000000; }
+
+        #import-file-input { display: none; }
+
+        /* Historial de posiciones */
+        #points-list {
+            margin-top: 15px;
+            overflow-y: auto;
+            border-top: 1px solid #dadce0;
+            padding-top: 12px;
+            max-height: 220px;
+        }
+
+        .point-item {
+            padding: 10px 4px;
+            border-bottom: 1px solid #dadce0;
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+        }
+        .point-item:hover { background-color: #f8f9fa; }
+
+        .point-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .history-label-input {
+            padding: 6px;
+            font-size: 13px;
+            margin-bottom: 0;
+            font-weight: 600;
+            flex-grow: 1;
+            border: 1px solid #dadce0;
+            background: #fff;
+        }
+
+        .history-coords-single-input {
+            padding: 6px;
+            font-size: 12px;
+            margin-bottom: 0;
+            color: #5f6368;
+            border: 1px solid #dadce0;
+            background: #f8f9fa;
+            border-radius: 4px;
+            flex-grow: 1;
+            font-family: monospace;
+        }
+
+        .btn-locate {
+            padding: 6px 12px;
+            font-size: 12px;
+            background-color: #f1f3f4;
+            color: #1a73e8;
+            border-radius: 4px;
+            font-weight: bold;
+            height: 30px;
+        }
+        .btn-locate:hover { background-color: #d2e3fc; }
+
+        /* Etiquetas de tramos parciales */
+        .route-leg-info {
+            font-size: 11px;
+            color: #1e8e3e;
+            font-weight: 600;
+            padding-left: 6px;
+            margin-top: 2px;
+        }
+
+        /* CUADRO RESUMEN TOTALES (DASHBOARD) */
+        .summary-box {
+            background-color: #f8f9fa;
+            border: 1px solid #dadce0;
+            border-radius: 6px;
+            padding: 12px;
+            margin-top: 15px;
+        }
+        .summary-box-title {
+            font-size: 11px;
+            font-weight: 700;
+            color: #202124;
+            text-transform: uppercase;
+            margin-bottom: 8px;
+            letter-spacing: 0.5px;
+            border-bottom: 1px solid #dadce0;
+            padding-bottom: 4px;
+        }
+        .summary-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 8px;
+        }
+        .summary-stat {
+            display: flex;
+            flex-direction: column;
+        }
+        .summary-stat-val {
+            font-size: 16px;
+            font-weight: 700;
+            color: var(--primary-color);
+        }
+        .summary-stat-lbl {
+            font-size: 10px;
+            color: #5f6368;
+        }
+
+        /* Diseño de los marcadores numéricos personalizados */
+        .custom-number-marker {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 50%;
+            color: white;
+            font-weight: bold;
+            font-size: 13px;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.4);
+            border: 2px solid white;
+        }
+
+        .map-label {
+            background: white !important;
+            border: 1px solid #202124 !important;
+            color: #202124 !important;
+            font-weight: bold !important;
+            border-radius: 4px !important;
+            padding: 4px 8px !important;
+            font-size: 12px !important;
+            box-shadow: 0 1px 4px rgba(0,0,0,0.2);
+        }
+
+        /* Selector de capas flotante inferior derecho */
+        .map-layer-control {
+            position: absolute;
+            bottom: 30px;
+            right: 20px;
+            z-index: 1000;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+
+        .layer-card {
+            width: 64px;
+            height: 64px;
+            border-radius: 8px;
+            border: 2px solid white;
+            box-shadow: 0 1px 4px rgba(0,0,0,0.3);
+            cursor: pointer;
+            position: relative;
+            overflow: hidden;
+            transition: transform 0.2s, border-color 0.2s, box-shadow 0.2s;
+            background-size: cover;
+            background-position: center;
+        }
+
+        .layer-card:hover {
+            transform: scale(1.05);
+            box-shadow: 0 2px 8px rgba(0,0,0,0.4);
+        }
+
+        .layer-card.active {
+            border-color: #1a73e8;
+            box-shadow: 0 0 0 1px #1a73e8, 0 2px 8px rgba(26,115,232,0.4);
+        }
+
+        .layer-card span {
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            background: rgba(255, 255, 255, 0.9);
+            color: #202124;
+            font-size: 10px;
+            font-weight: bold;
+            text-align: center;
+            padding: 2px 0;
+            font-family: Arial, sans-serif;
+        }
+
+        /* Popup de alta interactiva */
+        .popup-click-container { padding: 4px; min-width: 180px; }
+        .popup-click-title { font-size: 11px; font-weight: bold; color: #5f6368; margin-bottom: 6px; text-transform: uppercase; }
+        .popup-click-input { width: 100% !important; padding: 6px !important; font-size: 12px !important; margin-bottom: 8px !important; border: 1px solid #dadce0 !important; border-radius: 4px !important; box-sizing: border-box; }
+        .popup-click-btn { width: 100%; background-color: var(--primary-color); color: white; border: none; padding: 7px; border-radius: 4px; font-weight: bold; font-size: 11px; cursor: pointer; transition: background 0.2s; }
+        .popup-click-btn:hover { background-color: #1557b0; }
+
+        /* CONTENEDOR MAQUETADO EXCLUSIVO PARA EL INFORME PDF IMPRESO */
+        #print-zone { display: none; }
+
+        @page {
+            size: landscape;
+            margin: 1cm;
+        }
+
+        @media print {
+            body, html { overflow: visible !important; height: auto !important; background: white !important; }
+            .sidebar, .app-header, #map, .leaflet-control-zoom, .map-layer-control { display: none !important; }
+            #print-zone { display: block !important; width: 100% !important; }
+            .print-map-snapshot { width: 100% !important; max-height: 400px; object-fit: contain; border: 1px solid #dadce0; margin-bottom: 15px; }
+            .print-title { font-size: 16px; font-weight: bold; text-align: center; margin-bottom: 12px; text-transform: uppercase; border-bottom: 2px solid #202124; padding-bottom: 6px; color: #202124; }
+            
+            .print-summary-layout {
+                display: flex;
+                justify-content: space-around;
+                background-color: #f1f3f4 !important;
+                padding: 10px;
+                border-radius: 4px;
+                margin-bottom: 15px;
+                border: 1px solid #dadce0;
+                -webkit-print-color-adjust: exact;
+                print-color-adjust: exact;
+            }
+            .print-summary-item { text-align: center; }
+            .print-summary-val { font-size: 16px; font-weight: bold; color: #1a73e8; }
+            .print-summary-lbl { font-size: 10px; color: #5f6368; text-transform: uppercase; }
+
+            .print-table { width: 100%; border-collapse: collapse; }
+            .print-table th, .print-table td { border: 1px solid #dadce0; padding: 6px 10px; text-align: left; font-size: 11px; }
+            .print-table th { background-color: #f8f9fa !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+        }
+    </style>
+</head>
+<body>
+
+    <div class="app-header" id="header-title">MAPA DE POSICIONES GPS - SECCIÓN DE  INSPECCIÓN DE TRANSPORTES DE LEÓN © JCOS</div>
+
+    <div class="sidebar">
+        <div class="input-group">
+            <label for="coords">COORDENADAS GPS</label>
+            <input type="text" id="coords" placeholder="Ej: 42.599 -5.567">
+            
+            <label for="label">ETIQUETA DE LA CHINCHETA</label>
+            <input type="text" id="label" placeholder="Ej: Control de Peso Km 42">
+        </div>
+
+        <div class="btn-container">
+            <button class="btn-add" onclick="addPosition()">AÑADIR POSICION</button>
+        </div>
+        
+        <div class="btn-container">
+            <button class="btn-undo" onclick="removeLast()">BORRAR ÚLTIMA</button>
+            <button class="btn-reset" onclick="resetMap()">RESETEAR MAPA</button>
+        </div>
+
+        <div class="btn-container">
+            <button class="btn-export" onclick="exportData()">EXPORTAR DATOS</button>
+            <button class="btn-import" onclick="triggerImport()">IMPORTAR DATOS</button>
+        </div>
+        
+        <div class="btn-container">
+            <button class="btn-print" id="print-btn" onclick="printReport()">IMPRIMIR INFORME (PDF)</button>
+        </div>
+        
+        <input type="file" id="import-file-input" accept=".json" onchange="importData(event)">
+
+        <div id="points-list">
+            <label style="margin-bottom: 6px;">HISTORIAL DE TRAZABILIDAD (EDITABLE)</label>
+        </div>
+
+        <div class="summary-box">
+            <div class="summary-box-title">Resumen de Ruta Consolidado</div>
+            <div class="summary-grid">
+                <div class="summary-stat">
+                    <span class="summary-stat-val" id="total-km">0.0 km</span>
+                    <span class="summary-stat-lbl">Distancia Total</span>
+                </div>
+                <div class="summary-stat">
+                    <span class="summary-stat-val" id="total-time">0 min</span>
+                    <span class="summary-stat-lbl">Tiempo Conducción</span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="map-layer-control">
+        <div id="card-sat" class="layer-card active" onclick="switchLayer('sat')" style="background-image: url('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/4/6/4.png');">
+            <span>Satélite</span>
+        </div>
+        <div id="card-mapa" class="layer-card" onclick="switchLayer('mapa')" style="background-image: url('https://a.tile.openstreetmap.org/4/8/5.png');">
+            <span>Mapa</span>
+        </div>
+    </div>
+
+    <div id="map"></div>
+
+    <div id="print-zone">
+        <div class="print-title">Informe Técnico de Trazabilidad - Inspección de Transportes León</div>
+        
+        <div class="print-summary-layout">
+            <div class="print-summary-item">
+                <div class="print-summary-val" id="print-total-puntos">0</div>
+                <div class="print-summary-lbl">Controles Realizados</div>
+            </div>
+            <div class="print-summary-item">
+                <div class="print-summary-val" id="print-total-km">0.0 km</div>
+                <div class="print-summary-lbl">Kilómetros Totales</div>
+            </div>
+            <div class="print-summary-item">
+                <div class="print-summary-val" id="print-total-time">0 min</div>
+                <div class="print-summary-lbl">Tiempo Est. Ruta</div>
+            </div>
+        </div>
+
+        <div id="snapshot-container"></div> 
+        
+        <table class="print-table">
+            <thead>
+                <tr>
+                    <th style="width: 8%;">Orden</th>
+                    <th style="width: 42%;">Descripción / Punto de Control</th>
+                    <th style="width: 25%;">Coordenadas Geográficas</th>
+                    <th style="width: 25%;">Tramo Anterior (KM y Tiempo)</th>
+                </tr>
+            </thead>
+            <tbody id="print-table-body">
+            </tbody>
+        </table>
+    </div>
+
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    
+    <script>
+        const map = L.map('map', { 
+            zoomControl: false,
+            renderer: L.canvas() 
+        }).setView([42.599023, -5.567016], 11);
+
+        L.control.zoom({ position: 'topright' }).addTo(map);
+
+        const googleHybrid = L.tileLayer('http://{s}.google.com/vt/lyrs=y&x={x}&y={y}&z={z}', {
+            maxZoom: 20, subdomains: ['mt0','mt1','mt2','mt3']
+        });
+        const googleStreets = L.tileLayer('http://{s}.google.com/vt/lyrs=m&x={x}&y={y}&z={z}', {
+            maxZoom: 20, subdomains: ['mt0','mt1','mt2','mt3']
+        });
+
+        googleHybrid.addTo(map);
+
+        function switchLayer(type) {
+            const cardSat = document.getElementById('card-sat');
+            const cardMapa = document.getElementById('card-mapa');
+            if (type === 'sat') {
+                if (!map.hasLayer(googleHybrid)) { map.removeLayer(googleStreets); googleHybrid.addTo(map); }
+                cardSat.classList.add('active'); cardMapa.classList.remove('active');
+            } else {
+                if (!map.hasLayer(googleStreets)) { map.removeLayer(googleHybrid); googleStreets.addTo(map); }
+                cardMapa.classList.add('active'); cardSat.classList.remove('active');
+            }
+        }
+
+        let markersData = [];
+        let idCounter = 0;
+        let routePolyline = null; 
+
+        let globalKmsTotales = 0;
+        let globalMinutosTotales = 0;
+        let tramosInformacion = []; 
+
+        window.onload = function() {
+            loadFromLocalStorage();
+        };
+
+        map.on('click', function(e) {
+            const lat = e.latlng.lat; const lng = e.latlng.lng;
+            const defaultLabel = "Posición " + (markersData.length + 1);
+            const popupContent = `
+                <div class="popup-click-container">
+                    <div class="popup-click-title">Nueva Inspección</div>
+                    <input type="text" id="popup-label-input" class="popup-click-input" placeholder="${defaultLabel}" autofocus>
+                    <button class="popup-click-btn" onclick="addPositionFromClick(${lat}, ${lng})">AÑADIR AQUÍ</button>
+                </div>`;
+            L.popup().setLatLng(e.latlng).setContent(popupContent).openOn(map);
+        });
+
+        function addPositionFromClick(lat, lng) {
+            const inputVal = document.getElementById('popup-label-input').value.trim();
+            const finalLabel = inputVal || ("Posición " + (markersData.length + 1));
+            map.closePopup();
+            addPosition(lat, lng, finalLabel, true);
+        }
+
+        function getMarkerColor(index, total) {
+            if (index === 0) return '#1e8e3e'; 
+            if (index === total - 1) return '#d93025'; 
+            return '#1a73e8'; 
+        }
+
+        function updateMapGraphics() {
+            // Limpieza inicial controlada antes de evaluar
+            if (routePolyline !== null) {
+                map.removeLayer(routePolyline);
+                routePolyline = null;
+            }
+
+            const totalPoints = markersData.length;
+            tramosInformacion = []; 
+
+            // Actualizar iconos numéricos
+            markersData.forEach((item, index) => {
+                const color = getMarkerColor(index, totalPoints);
+                const htmlIcon = L.divIcon({
+                    className: 'custom-number-marker',
+                    html: `<div style="background-color: ${color}; width:26px; height:26px; border-radius:50%; display:flex; align-items:center; justify-content:center; border:2px solid white; box-shadow:0 2px 4px rgba(0,0,0,0.3);">${index + 1}</div>`,
+                    iconSize: [26, 26], iconAnchor: [13, 13]
+                });
+                item.marker.setIcon(htmlIcon);
+            });
+
+            // Si hay menos de 2 chinchetas, limpiamos cuadros y abortamos llamadas de red
+            if (totalPoints < 2) {
+                document.getElementById('total-km').innerText = "0.0 km";
+                document.getElementById('total-time').innerText = "0 min";
+                markersData.forEach((item) => {
+                    const el = document.getElementById('leg-' + item.id);
+                    if(el) el.innerText = "";
+                });
+                return; 
+            }
+
+            let coordsString = markersData.map(item => `${item.lng},${item.lat}`).join(';');
+            let url = `https://router.project-osrm.org/route/v1/driving/${coordsString}?overview=full&geometries=geojson`;
+
+            fetch(url)
+                .then(response => response.json())
+                .then(data => {
+                    // Doble verificación: si mientras la red respondía el usuario borró puntos, cancelamos el pintado
+                    if (markersData.length < 2) {
+                        if (routePolyline !== null) { map.removeLayer(routePolyline); routePolyline = null; }
+                        return;
+                    }
+
+                    if (data.code === 'Ok' && data.routes && data.routes.length > 0) {
+                        const route = data.routes[0];
+                        
+                        const coordenadasCarretera = route.geometry.coordinates.map(c => [c[1], c[0]]);
+                        routePolyline = L.polyline(coordenadasCarretera, {
+                            color: '#ff4a4a', weight: 6, opacity: 0.85, lineJoin: 'round'
+                        }).addTo(map);
+
+                        globalKmsTotales = (route.distance / 1000).toFixed(1);
+                        globalMinutosTotales = Math.round(route.duration / 60);
+
+                        route.legs.forEach((leg, index) => {
+                            if (!markersData[index + 1]) return;
+                            const kmTramo = (leg.distance / 1000).toFixed(1);
+                            const minTramo = Math.round(leg.duration / 60);
+                            const targetId = markersData[index + 1].id;
+                            
+                            const textInfo = `+ ${kmTramo} km (~${minTramo} min)`;
+                            tramosInformacion.push({ km: kmTramo, min: minTramo, txt: textInfo });
+                            
+                            const el = document.getElementById('leg-' + targetId);
+                            if(el) el.innerText = textInfo;
+                        });
+
+                        document.getElementById('total-km').innerText = globalKmsTotales + " km";
+                        document.getElementById('total-time').innerText = formatMinutes(globalMinutosTotales);
+                    } else {
+                        runFallbackGeometry();
+                    }
+                })
+                .catch(err => {
+                    if (markersData.length >= 2) runFallbackGeometry();
+                });
+        }
+
+        function runFallbackGeometry() {
+            if (routePolyline !== null) { map.removeLayer(routePolyline); routePolyline = null; }
+            if (markersData.length < 2) return;
+            
+            let acumuladoKm = 0;
+            for(let i = 0; i < markersData.length - 1; i++) {
+                const p1 = markersData[i]; const p2 = markersData[i+1];
+                const d = haversineDistance(p1.lat, p1.lng, p2.lat, p2.lng);
+                acumuladoKm += d;
+
+                const tMin = Math.round((d * 1.25) / 80 * 60); 
+                const textInfo = `+ ${d.toFixed(1)} km (~${tMin} min) *`;
+                tramosInformacion.push({ km: d.toFixed(1), min: tMin, txt: textInfo });
+
+                const el = document.getElementById('leg-' + p2.id);
+                if(el) el.innerText = textInfo;
+            }
+
+            globalKmsTotales = acumuladoKm.toFixed(1);
+            globalMinutosTotales = Math.round((acumuladoKm * 1.25) / 80 * 60);
+
+            const latLngs = markersData.map(item => [item.lat, item.lng]);
+            routePolyline = L.polyline(latLngs, {
+                color: '#ff4a4a', weight: 5, opacity: 0.8, dashArray: '5, 10'
+            }).addTo(map);
+
+            document.getElementById('total-km').innerText = globalKmsTotales + " km";
+            document.getElementById('total-time').innerText = formatMinutes(globalMinutosTotales);
+        }
+
+        function haversineDistance(lat1, lon1, lat2, lon2) {
+            const R = 6371; const dLat = (lat2 - lat1) * Math.PI / 180; const dLon = (lon2 - lon1) * Math.PI / 180;
+            const a = Math.sin(dLat/2) * Math.sin(dLat/2) + Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) * Math.sin(dLon/2) * Math.sin(dLon/2);
+            return R * (2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a)));
+        }
+
+        function formatMinutes(mins) {
+            if(mins < 60) return mins + " min";
+            const hrs = Math.floor(mins / 60); const rem = mins % 60;
+            return rem === 0 ? `${hrs}h` : `${hrs}h ${rem}min`;
+        }
+
+        function saveToLocalStorage() {
+            const dataToSave = markersData.map(item => ({ label: item.label, lat: item.lat, lng: item.lng }));
+            localStorage.setItem('map_inspection_data', JSON.stringify(dataToSave));
+        }
+
+        function loadFromLocalStorage() {
+            const savedData = localStorage.getItem('map_inspection_data');
+            if (savedData) {
+                try {
+                    const points = JSON.parse(savedData);
+                    if (Array.isArray(points) && points.length > 0) {
+                        points.forEach(pt => { addPosition(pt.lat, pt.lng, pt.label, false); });
+                        const lastPt = points[points.length - 1];
+                        map.setView([lastPt.lat, lastPt.lng], 11);
+                    }
+                } catch(e) { console.error(e); }
+            }
+        }
+
+        function addPosition(customLat = null, customLng = null, customLabel = null, triggerSave = true) {
+            let lat, lng, labelInput;
+            if (customLat !== null && customLng !== null) {
+                lat = customLat; lng = customLng; labelInput = customLabel;
+            } else {
+                const coordInput = document.getElementById('coords').value.trim();
+                labelInput = document.getElementById('label').value.trim() || ("Posición " + (markersData.length + 1));
+                const cleanCoords = coordInput.replace(/,/g, '.'); const parts = cleanCoords.split(/\s+/);
+                if (parts.length >= 2) { lat = parseFloat(parts[0]); lng = parseFloat(parts[1]); } else { alert("Introduce latitud y longitud válidas."); return; }
+            }
+
+            if (!isNaN(lat) && !isNaN(lng)) {
+                const marker = L.marker([lat, lng]).addTo(map);
+                marker.bindTooltip(labelInput, { permanent: true, direction: 'top', offset: [0, -15], className: 'map-label' }).openTooltip();
+                
+                const pointId = 'point-' + idCounter++;
+                markersData.push({ id: pointId, marker: marker, label: labelInput, lat: lat, lng: lng });
+
+                map.panTo([lat, lng]);
+                createHistoryItem(pointId, labelInput, lat, lng);
+
+                if (customLat === null) { document.getElementById('coords').value = ""; document.getElementById('label').value = ""; }
+
+                updateMapGraphics();
+                if (triggerSave) saveToLocalStorage();
+            }
+        }
+
+        function createHistoryItem(id, name, lat, lng) {
+            const list = document.getElementById('points-list');
+            const itemContainer = document.createElement('div');
+            itemContainer.className = 'point-item'; itemContainer.id = id;
+            const currentCoordsString = `${lat} ${lng}`;
+
+            itemContainer.innerHTML = `
+                <div class="point-row">
+                    <input type="text" class="history-label-input" value="${name}" oninput="updateMarkerLabel('${id}', this.value)">
+                    <button class="btn-locate" onclick="focusMarker('${id}')">Ir</button>
+                </div>
+                <div class="point-row">
+                    <input type="text" class="history-coords-single-input" value="${currentCoordsString}" oninput="updateMarkerPositionSingle('${id}', this.value)">
+                </div>
+                <div class="route-leg-info" id="leg-${id}"></div>
+            `;
+            list.appendChild(itemContainer);
+        }
+
+        function updateMarkerLabel(id, newText) {
+            const data = markersData.find(item => item.id === id);
+            if (data) {
+                data.label = newText;
+                if (data.marker) {
+                    data.marker.unbindTooltip();
+                    data.marker.bindTooltip(newText || " ", { permanent: true, direction: 'top', offset: [0, -15], className: 'map-label' }).openTooltip();
+                }
+                saveToLocalStorage();
+            }
+        }
+
+        function updateMarkerPositionSingle(id, fullStringValue) {
+            const data = markersData.find(item => item.id === id);
+            if (data && data.marker) {
+                const cleanCoords = fullStringValue.replace(/,/g, '.').trim(); const parts = cleanCoords.split(/\s+/);
+                if (parts.length >= 2) {
+                    const newLat = parseFloat(parts[0]); const newLng = parseFloat(parts[1]);
+                    if (!isNaN(newLat) && !isNaN(newLng)) {
+                        data.lat = newLat; data.lng = newLng; data.marker.setLatLng([newLat, newLng]);
+                        updateMapGraphics(); saveToLocalStorage();
+                    }
+                }
+            }
+        }
+
+        function focusMarker(id) { const data = markersData.find(item => item.id === id); if (data) map.setView([data.lat, data.lng], 15); }
+
+        function removeLast() {
+            if (markersData.length > 0) {
+                const lastData = markersData.pop(); 
+                map.removeLayer(lastData.marker);
+                
+                const elementHtml = document.getElementById(lastData.id); 
+                if (elementHtml) elementHtml.remove();
+                
+                // CRUCIAL: Eliminar físicamente el trazo aquí de forma síncrona inmediata
+                if (routePolyline !== null) {
+                    map.removeLayer(routePolyline);
+                    routePolyline = null;
+                }
+                
+                // Recalcular el estado gráfico
+                updateMapGraphics(); 
+                saveToLocalStorage();
+            }
+        }
+
+        function resetMap() {
+            if (confirm("¿Eliminar toda la trazabilidad actual?")) {
+                // Eliminar marcadores individuales
+                markersData.forEach(item => map.removeLayer(item.marker)); 
+                markersData = [];
+                
+                // CRUCIAL: Forzar limpieza total del trazo de forma síncrona e inequívoca
+                if (routePolyline !== null) {
+                    map.removeLayer(routePolyline);
+                    routePolyline = null;
+                }
+                
+                // Resetear elementos del DOM del panel
+                document.getElementById('points-list').innerHTML = '<label style="margin-bottom: 6px;">HISTORIAL DE TRAZABILIDAD (EDITABLE)</label>';
+                idCounter = 0;
+                document.getElementById('total-km').innerText = "0.0 km";
+                document.getElementById('total-time').innerText = "0 min";
+                localStorage.removeItem('map_inspection_data');
+            }
+        }
+
+        function exportData() {
+            if (markersData.length === 0) return;
+            const dataToExport = markersData.map(item => ({ label: item.label, lat: item.lat, lng: item.lng }));
+            const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(dataToExport, null, 2));
+            const downloadAnchor = document.createElement('a');
+            const fecha = new Date().toISOString().slice(0,10);
+            downloadAnchor.setAttribute("href", dataStr); downloadAnchor.setAttribute("download", `trazabilidad_transporte_${fecha}.json`);
+            document.body.appendChild(downloadAnchor); downloadAnchor.click(); downloadAnchor.remove();
+        }
+
+        function triggerImport() { document.getElementById('import-file-input').click(); }
+
+        function importData(event) {
+            const file = event.target.files[0]; if (!file) return;
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                try {
+                    const importedPoints = JSON.parse(e.target.result);
+                    if (Array.isArray(importedPoints)) {
+                        markersData.forEach(item => map.removeLayer(item.marker)); markersData = [];
+                        if (routePolyline !== null) { map.removeLayer(routePolyline); routePolyline = null; }
+                        document.getElementById('points-list').innerHTML = '<label style="margin-bottom: 6px;">HISTORIAL DE TRAZABILIDAD (EDITABLE)</label>';
+                        importedPoints.forEach(pt => { addPosition(pt.lat, pt.lng, pt.label, false); });
+                        if(importedPoints.length > 0) map.setView([importedPoints[importedPoints.length - 1].lat, importedPoints[importedPoints.length - 1].lng], 11);
+                        updateMapGraphics(); saveToLocalStorage();
+                    }
+                } catch (err) { alert("Archivo no válido."); }
+            };
+            reader.readAsText(file); event.target.value = '';
+        }
+
+        function printReport() {
+            if (markersData.length === 0) { alert("Añada posiciones para imprimir."); return; }
+
+            const btn = document.getElementById('print-btn');
+            btn.innerText = "PROCESANDO INFORME..."; btn.disabled = true;
+
+            document.getElementById('print-total-puntos').innerText = markersData.length;
+            document.getElementById('print-total-km').innerText = globalKmsTotales + " km";
+            document.getElementById('print-total-time').innerText = formatMinutes(globalMinutosTotales);
+
+            const tableBody = document.getElementById('print-table-body');
+            tableBody.innerHTML = ""; 
+            
+            markersData.forEach((item, index) => {
+                const tramoinfo = (index === 0) ? "Punto de salida inicial" : (tramosInformacion[index - 1] ? tramosInformacion[index - 1].txt : "-");
+                const row = document.createElement('tr');
+                row.innerHTML = `
+                    <td style="font-weight:bold; text-align:center;">${index + 1}</td>
+                    <td>${item.label}</td>
+                    <td style="font-family:monospace; font-size:10px;">${item.lat.toFixed(5)}, ${item.lng.toFixed(5)}</td>
+                    <td style="color:#1e8e3e; font-weight:600;">${tramoinfo}</td>
+                `;
+                tableBody.appendChild(row);
+            });
+
+            const mapContainer = document.getElementById('map');
+            
+            html2canvas(mapContainer, {
+                useCORS: true, allowTaint: true, logging: false, scale: 1.5
+            }).then(canvas => {
+                const snapshotContainer = document.getElementById('snapshot-container');
+                snapshotContainer.innerHTML = "";
+                
+                const img = new Image();
+                img.src = canvas.toDataURL('image/png');
+                img.className = 'print-map-snapshot';
+                snapshotContainer.appendChild(img);
+
+                setTimeout(() => {
+                    window.print();
+                    btn.innerText = "IMPRIMIR INFORME (PDF)"; btn.disabled = false;
+                }, 300);
+            }).catch(err => {
+                alert("Error al procesar gráficos.");
+                btn.innerText = "IMPRIMIR INFORME (PDF)"; btn.disabled = false;
+            });
+        }
+    </script>
+</body>
+</html>
