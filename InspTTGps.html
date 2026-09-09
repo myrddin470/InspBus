@@ -115,6 +115,12 @@
             box-sizing: border-box;
         }
 
+                    /* Estilos para el buscador de localidades */
+            .geocoder-container { position: relative; margin-bottom: 12px; }
+            .geocoder-results { position: absolute; top: 100%; left: 0; right: 0; background: white; border: 1px solid #dadce0; border-radius: 0 0 4px 4px; max-height: 150px; overflow-y: auto; z-index: 1001; box-shadow: 0 4px 6px rgba(0,0,0,0.1); display: none; }
+            .geocoder-result-item { padding: 8px 10px; font-size: 12px; cursor: pointer; border-bottom: 1px solid #f1f3f4; color: #202124; }
+            .geocoder-result-item:hover { background-color: #f8f9fa; color: var(--primary-color); }
+
         .input-group { margin-bottom: 8px; }
         label { display: block; font-size: 11px; color: #5f6368; margin-bottom: 4px; font-weight: 700; letter-spacing: 0.5px; }
         input, textarea { width: 100%; padding: 9px; border: 1px solid #dadce0; border-radius: 4px; box-sizing: border-box; font-size: 13px; margin-bottom: 8px; color: #202124; font-family: inherit; }
@@ -270,6 +276,14 @@
     </div>
 
     <div class="sidebar">
+
+        <div class="input-group geocoder-container">
+            <label for="search-locality">BUSCAR LOCALIDAD / MUNICIPIO</label>
+            <input type="text" id="search-locality" placeholder="Ej: León, Ponferrada, Astorga..." autocomplete="off" oninput="buscarLocalidad(this.value)">
+            <div id="geocoder-results" class="geocoder-results"></div>
+        </div>
+
+
         <div class="input-group">
             <label for="coords">COORDENADAS GPS</label>
             <input type="text" id="coords" placeholder="Ej: 42.599 -5.567">
@@ -1205,6 +1219,68 @@
             reader.readAsText(file);
             event.target.value = '';
         }
+
+
+let searchTimeout = null;
+
+        function buscarLocalidad(query) {
+            clearTimeout(searchTimeout);
+            const resultsContainer = document.getElementById('geocoder-results');
+            
+            if (!query || query.trim().length < 3) {
+                resultsContainer.style.display = 'none';
+                return;
+            }
+
+            // Espera medio segundo tras dejar de escribir para no saturar la API pública
+            searchTimeout = setTimeout(() => {
+                const url = `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(query)}&countrycodes=es&limit=5`;
+                
+                fetch(url)
+                    .then(response => response.json())
+                    .then(data => {
+                        resultsContainer.innerHTML = '';
+                        if (data && data.length > 0) {
+                            resultsContainer.style.display = 'block';
+                            data.forEach(item => {
+                                const div = document.createElement('div');
+                                div.className = 'geocoder-result-item';
+                                div.innerText = item.display_name;
+                                div.onclick = () => seleccionarLocalidad(item.lat, item.lon, item.display_name);
+                                resultsContainer.appendChild(div);
+                            });
+                        } else {
+                            resultsContainer.style.display = 'none';
+                        }
+                    })
+                    .catch(err => console.error("Error en geocodificación:", err));
+            }, 400);
+        }
+
+        function seleccionarLocalidad(lat, lon, displayName) {
+            const parsedLat = parseFloat(lat);
+            const parsedLon = parseFloat(lon);
+            
+            // Centra el mapa en la localidad seleccionada con zoom detallado
+            map.setView([parsedLat, parsedLon], 13);
+            
+            // Oculta el desplegable y limpia o rellena campos si lo deseas
+            document.getElementById('geocoder-results').style.display = 'none';
+            document.getElementById('search-locality').value = displayName.split(',')[0]; // Pone el nombre corto en la caja
+            
+            // Opcional: Rellena automáticamente las coordenadas de la caja de abajo por si quieres fijarla rápido
+            document.getElementById('coords').value = `${parsedLat.toFixed(6)} ${parsedLon.toFixed(6)}`;
+            document.getElementById('label').value = displayName.split(',')[0];
+        }
+
+        // Ocultar resultados si se hace clic fuera del buscador
+        document.addEventListener('click', function(e) {
+            if (!e.target.closest('.geocoder-container')) {
+                const resultsContainer = document.getElementById('geocoder-results');
+                if(resultsContainer) resultsContainer.style.display = 'none';
+            }
+        });
+
 
     </script>
 </body>
