@@ -1,0 +1,1153 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Mapa de Posiciones Inspección de Transportes León</title>
+    
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+    
+    <!-- FIREBASE SDK (Compat v8) -->
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-auth.js"></script>
+
+    <style>
+        :root {
+            --primary-color: #1a73e8;
+            --primary-dark: #1557b0;
+            --danger-color: #d93025;
+            --success-color: #1e8e3e;
+            --dark-bg: #202124;
+            --sidebar-bg: rgba(255, 255, 255, 0.96);
+        }
+
+        body, html {
+            margin: 0;
+            padding: 0;
+            height: 100%;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            overflow: hidden;
+            background-color: #f8f9fa;
+        }
+
+        #map {
+            height: 100vh;
+            width: 100vw;
+            z-index: 1;
+        }
+
+        /* Capa de Autenticación */
+        #auth-overlay {
+            position: fixed;
+            top: 0; left: 0; width: 100vw; height: 100vh;
+            background: #f8f9fa;
+            z-index: 9999;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            flex-direction: column;
+            text-align: center;
+        }
+        .auth-card {
+            background: white; padding: 40px; border-radius: 12px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.1); border: 1px solid #dadce0; max-width: 400px;
+        }
+        .btn-google {
+            background-color: var(--primary-color); color: white; border: none;
+            padding: 12px 20px; font-size: 14px; font-weight: bold; border-radius: 6px;
+            cursor: pointer; margin-top: 20px; width: 100%; transition: background 0.2s;
+        }
+        .btn-google:hover { background-color: var(--primary-dark); }
+
+        /* Título Superior */
+        .app-header {
+            position: absolute;
+            top: 15px;
+            right: 110px;
+            z-index: 1000;
+            background: white;
+            padding: 10px 25px;
+            border-radius: 25px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.25);
+            font-weight: 700;
+            color: #202124;
+            text-transform: uppercase;
+            letter-spacing: 1.2px;
+            font-size: 13px;
+            border: 1px solid #dadce0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 12px;
+        }
+
+        .header-logo {
+            height: 24px;
+            width: auto;
+            display: block;
+        }
+
+        .user-controls {
+            display: flex; align-items: center; gap: 10px;
+            border-left: 1px solid #dadce0; padding-left: 15px; margin-left: 5px;
+            pointer-events: auto; /* Permite clic en logout */
+        }
+        
+        .user-email { font-size: 11px; color: var(--primary-color); font-weight: bold; text-transform: lowercase; }
+
+        /* Barra Lateral Flotante */
+        .sidebar {
+            position: absolute;
+            top: 15px;
+            left: 15px;
+            width: 390px;
+            background: var(--sidebar-bg);
+            z-index: 1000;
+            border-radius: 8px;
+            box-shadow: 0 2px 6px rgba(0,0,0,0.3);
+            padding: 20px;
+            max-height: 94vh;
+            display: flex;
+            flex-direction: column;
+            border: 1px solid #dadce0;
+            box-sizing: border-box;
+        }
+
+        .input-group { margin-bottom: 8px; }
+        label { display: block; font-size: 11px; color: #5f6368; margin-bottom: 4px; font-weight: 700; letter-spacing: 0.5px; }
+        input, textarea { width: 100%; padding: 9px; border: 1px solid #dadce0; border-radius: 4px; box-sizing: border-box; font-size: 13px; margin-bottom: 8px; color: #202124; font-family: inherit; }
+        input:focus, textarea:focus { outline: none; border-color: var(--primary-color); box-shadow: 0 0 0 2px rgba(26,115,232,0.2); }
+
+        /* Botones */
+        .btn-container { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 8px; }
+        button { padding: 10px; border: none; border-radius: 4px; cursor: pointer; font-weight: 600; font-size: 12px; transition: background 0.2s, box-shadow 0.2s, transform 0.1s; }
+        button:active { transform: scale(0.98); }
+
+        .btn-add { background-color: var(--primary-color); color: white; grid-column: span 2; box-shadow: 0 1px 3px rgba(0,0,0,0.1); font-size: 13px; padding: 11px; }
+        .btn-add:hover { background-color: var(--primary-dark); }
+        .btn-undo { background-color: #f1f3f4; color: #3c4043; }
+        .btn-undo:hover { background-color: #e8eaed; }
+        .btn-clear { background-color: #fce8e6; color: var(--danger-color); }
+        .btn-clear:hover { background-color: #f9d2ce; }
+        .btn-save-main { background-color: #1e8e3e; color: white; grid-column: span 2; font-size: 13px; padding: 11px; box-shadow: 0 1px 3px rgba(0,0,0,0.15); }
+        .btn-save-main:hover { background-color: #137333; }
+        .btn-history-main { background-color: #1a73e8; color: white; grid-column: span 2; font-size: 13px; padding: 11px; box-shadow: 0 1px 3px rgba(0,0,0,0.15); }
+        .btn-history-main:hover { background-color: #1557b0; }
+        .btn-export { background-color: #e6f4ea; color: var(--success-color); }
+        .btn-export:hover { background-color: #ceead6; }
+        .btn-import { background-color: #e8f0fe; color: var(--primary-color); }
+        .btn-import:hover { background-color: #d2e3fc; }
+        .btn-print { background-color: var(--dark-bg); color: white; grid-column: span 2; font-size: 13px; padding: 11px; box-shadow: 0 1px 3px rgba(0,0,0,0.2); }
+        .btn-print:hover { background-color: #000000; }
+        .btn-logout { background-color: #fce8e6; color: var(--danger-color); padding: 5px 10px; border: 1px solid #f9d2ce; font-size: 10px; border-radius: 4px; }
+        .btn-logout:hover { background-color: #f9d2ce; }
+
+        #import-file-input { display: none; }
+
+        /* Historial lateral */
+        #points-list { margin-top: 8px; overflow-y: auto; border-top: 1px solid #dadce0; padding-top: 8px; max-height: 180px; }
+        .point-item { padding: 8px 2px; border-bottom: 1px solid #dadce0; display: flex; flex-direction: column; gap: 4px; }
+        .point-item:hover { background-color: #f8f9fa; }
+        .point-row { display: flex; justify-content: space-between; align-items: center; gap: 6px; }
+        .history-label-input { padding: 5px; font-size: 12px; margin-bottom: 0; font-weight: 600; flex-grow: 1; border: 1px solid #dadce0; background: #fff; }
+        .history-coords-single-input { padding: 5px; font-size: 11px; margin-bottom: 0; color: #5f6368; border: 1px solid #dadce0; background: #f8f9fa; border-radius: 4px; flex-grow: 1; font-family: monospace; }
+        .btn-locate { padding: 5px 8px; font-size: 11px; background-color: #f1f3f4; color: #1a73e8; border-radius: 4px; font-weight: bold; height: 28px; border: 1px solid #dadce0; }
+        .btn-locate:hover { background-color: #d2e3fc; border-color: #1a73e8; }
+        .btn-delete-item { padding: 5px 8px; font-size: 11px; background-color: #fce8e6; color: var(--danger-color); border-radius: 4px; height: 28px; border: 1px solid #f9d2ce; display: flex; align-items: center; justify-content: center; }
+        .btn-delete-item:hover { background-color: #f9d2ce; }
+        .route-leg-info { font-size: 11px; color: #1e8e3e; font-weight: 600; padding-left: 4px; }
+
+        /* Resumen */
+        .summary-box { background-color: #f8f9fa; border: 1px solid #dadce0; border-radius: 6px; padding: 10px; margin-top: 10px; }
+        .summary-box-title { font-size: 10px; font-weight: 700; color: #202124; text-transform: uppercase; margin-bottom: 6px; letter-spacing: 0.5px; border-bottom: 1px solid #dadce0; padding-bottom: 4px; }
+        .summary-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+        .summary-stat { display: flex; flex-direction: column; }
+        .summary-stat-val { font-size: 15px; font-weight: 700; color: var(--primary-color); }
+        .summary-stat-lbl { font-size: 10px; color: #5f6368; }
+
+        /* Marcadores y Capas */
+        .custom-number-marker { display: flex; align-items: center; justify-content: center; border-radius: 50%; color: white; font-weight: bold; font-size: 12px; box-shadow: 0 2px 5px rgba(0,0,0,0.4); border: 2px solid white; }
+        .map-label { background: white !important; border: 1px solid #202124 !important; color: #202124 !important; font-weight: bold !important; border-radius: 4px !important; padding: 3px 6px !important; font-size: 11px !important; box-shadow: 0 1px 4px rgba(0,0,0,0.2); }
+        .svg-arrow-icon { transition: transform 0.1s linear; filter: drop-shadow(0px 2px 3px rgba(0,0,0,0.5)); }
+        
+        .map-layer-control { position: absolute; bottom: 30px; right: 20px; z-index: 1000; display: flex; flex-direction: column; gap: 10px; }
+        .layer-card { width: 60px; height: 60px; border-radius: 8px; border: 2px solid white; box-shadow: 0 1px 4px rgba(0,0,0,0.3); cursor: pointer; position: relative; overflow: hidden; transition: transform 0.2s, border-color 0.2s, box-shadow 0.2s; background-size: cover; background-position: center; }
+        .layer-card:hover { transform: scale(1.05); }
+        .layer-card.active { border-color: #1a73e8; box-shadow: 0 0 0 1px #1a73e8, 0 2px 8px rgba(26,115,232,0.4); }
+        .layer-card span { position: absolute; bottom: 0; left: 0; right: 0; background: rgba(255, 255, 255, 0.9); color: #202124; font-size: 10px; font-weight: bold; text-align: center; padding: 2px 0; }
+        .popup-click-container { padding: 4px; min-width: 170px; }
+        .popup-click-title { font-size: 11px; font-weight: bold; color: #5f6368; margin-bottom: 6px; text-transform: uppercase; }
+        .popup-click-input { width: 100% !important; padding: 6px !important; font-size: 12px !important; margin-bottom: 8px !important; border: 1px solid #dadce0 !important; border-radius: 4px !important; box-sizing: border-box; }
+        .popup-click-btn { width: 100%; background-color: var(--primary-color); color: white; border: none; padding: 7px; border-radius: 4px; font-weight: bold; font-size: 11px; cursor: pointer; }
+
+        /* MODALES PROFESIONALES */
+        .modal-overlay { position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: rgba(32, 33, 36, 0.6); backdrop-filter: blur(3px); z-index: 2000; display: flex; align-items: center; justify-content: center; opacity: 0; pointer-events: none; transition: opacity 0.25s ease; }
+        .modal-overlay.active { opacity: 1; pointer-events: auto; }
+        .modal-card { background: #ffffff; width: 90%; max-width: 680px; max-height: 85vh; border-radius: 12px; box-shadow: 0 12px 32px rgba(0,0,0,0.25); display: flex; flex-direction: column; overflow: hidden; animation: modalSlide 0.25s cubic-bezier(0.16, 1, 0.3, 1); }
+        @keyframes modalSlide { from { transform: translateY(18px) scale(0.97); } to { transform: translateY(0) scale(1); } }
+        .modal-header { padding: 16px 20px; background: #f8f9fa; border-bottom: 1px solid #dadce0; display: flex; justify-content: space-between; align-items: center; }
+        .modal-header h3 { margin: 0; font-size: 15px; color: #202124; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; }
+        .modal-close { background: transparent; border: none; font-size: 22px; cursor: pointer; color: #5f6368; line-height: 1; padding: 4px; border-radius: 50%; }
+        .modal-close:hover { color: var(--danger-color); background: #fce8e6; }
+        .modal-body { padding: 20px; overflow-y: auto; flex-grow: 1; }
+        .modal-footer { padding: 12px 20px; background: #f8f9fa; border-top: 1px solid #dadce0; display: flex; justify-content: flex-end; gap: 10px; }
+
+        /* Tarjetas del Historial */
+        .archive-search-bar { display: flex; flex-direction: column; gap: 8px; margin-bottom: 15px; }
+        .archive-date-range { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+        .archive-list-container { display: flex; flex-direction: column; gap: 12px; }
+        .archive-card { border: 1px solid #dadce0; border-radius: 8px; padding: 14px; background: #fff; box-shadow: 0 1px 3px rgba(0,0,0,0.05); transition: border-color 0.2s, box-shadow 0.2s; }
+        .archive-card:hover { border-color: var(--primary-color); box-shadow: 0 3px 8px rgba(26,115,232,0.15); }
+        .archive-card-header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 8px; }
+        .archive-title { font-size: 14px; font-weight: 700; color: #202124; }
+        .archive-date-badge { background: #e8f0fe; color: var(--primary-color); font-size: 11px; font-weight: 700; padding: 4px 8px; border-radius: 12px; white-space: nowrap; }
+        .archive-stats { display: flex; gap: 15px; font-size: 12px; color: #5f6368; margin-bottom: 8px; background: #f8f9fa; padding: 6px 10px; border-radius: 4px; }
+        .archive-stats strong { color: #202124; }
+        .archive-notes { font-size: 12px; color: #3c4043; font-style: italic; margin-bottom: 10px; }
+        .archive-actions { display: flex; justify-content: flex-end; gap: 8px; }
+        .btn-action-sm { padding: 6px 12px; font-size: 11px; border-radius: 4px; }
+        .empty-history-msg { text-align: center; color: #5f6368; padding: 30px 10px; font-style: italic; }
+
+        /* IMPRESIÓN */
+        #print-zone { display: none; }
+        @page { size: landscape; margin: 1cm; }
+        @media print {
+            body, html { overflow: visible !important; height: auto !important; background: white !important; }
+            .sidebar, .app-header, #map, .leaflet-control-zoom, .map-layer-control, .modal-overlay, #auth-overlay { display: none !important; }
+            #print-zone { display: block !important; width: 100% !important; }
+            .print-map-snapshot { width: 100% !important; max-height: 380px; object-fit: contain; border: 1px solid #dadce0; margin-bottom: 12px; }
+            .print-title { font-size: 16px; font-weight: bold; text-align: center; margin-bottom: 4px; text-transform: uppercase; color: #202124; }
+            .print-subtitle { font-size: 13px; font-weight: 600; text-align: center; margin-bottom: 10px; color: #1a73e8; border-bottom: 2px solid #202124; padding-bottom: 6px; }
+            .print-summary-layout { display: flex; justify-content: space-around; background-color: #f1f3f4 !important; padding: 8px; border-radius: 4px; margin-bottom: 10px; border: 1px solid #dadce0; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+            .print-summary-item { text-align: center; }
+            .print-summary-val { font-size: 15px; font-weight: bold; color: #1a73e8; }
+            .print-summary-lbl { font-size: 10px; color: #5f6368; text-transform: uppercase; }
+            .print-table { width: 100%; border-collapse: collapse; }
+            .print-table th, .print-table td { border: 1px solid #dadce0; padding: 6px 10px; text-align: left; font-size: 11px; }
+            .print-table th { background-color: #f8f9fa !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+            .print-notes { font-size: 11px; margin-bottom: 10px; padding: 6px 10px; background: #fafafa; border-left: 3px solid #1a73e8; }
+            .print-archive-list-zone { display: block !important; width: 100% !important; }
+        }
+    </style>
+</head>
+<body>
+
+    <!-- OVERLAY DE AUTENTICACIÓN FIREBASE -->
+    <div id="auth-overlay">
+        <div class="auth-card">
+            <h2 style="margin-top: 0; color: #202124;">Acceso Requerido</h2>
+            <p style="color: #5f6368; font-size: 14px;">La base de datos de inspecciones está protegida. Identifícate con tu cuenta autorizada para acceder a los recorridos.</p>
+            <button class="btn-google" onclick="iniciarSesionGoogle()">Iniciar sesión con Google</button>
+        </div>
+    </div>
+
+    <div class="app-header" id="header-title">
+        <img src="images.png" alt="Logo" class="header-logo" onerror="this.style.display='none'">
+        <span>MAPA DE POSICIONES GPS - SECCIÓN DE INSPECCIÓN DE TRANSPORTES DE LEÓN</span>
+        <div class="user-controls">
+            <span class="user-email" id="display-user-email"></span>
+            <button class="btn-logout" onclick="cerrarSesion()">Cerrar Sesión</button>
+        </div>
+    </div>
+
+    <div class="sidebar">
+        <div class="input-group">
+            <label for="coords">COORDENADAS GPS</label>
+            <input type="text" id="coords" placeholder="Ej: 42.599 -5.567">
+            
+            <label for="label">ETIQUETA DE LA CHINCHETA</label>
+            <input type="text" id="label" placeholder="Ej: Control de Peso Km 42">
+        </div>
+
+        <div class="btn-container">
+            <button class="btn-add" onclick="addPosition()">AÑADIR POSICION</button>
+        </div>
+        
+        <div class="btn-container">
+            <button class="btn-undo" onclick="removeLast()">BORRAR ÚLTIMA</button>
+            <button class="btn-clear" onclick="confirmClearMap()">LIMPIAR PANTALLA</button>
+        </div>
+
+        <div class="btn-container">
+            <button class="btn-save-main" onclick="openSaveModal()">💾 GUARDAR / ARCHIVAR RECORRIDO</button>
+        </div>
+
+        <div class="btn-container">
+            <button class="btn-history-main" onclick="openArchiveModal()">📁 VER RECORRIDOS ARCHIVADOS</button>
+        </div>
+
+        <div class="btn-container">
+            <button class="btn-export" onclick="exportData()">EXPORTAR JSON</button>
+            <button class="btn-import" onclick="triggerImport()">IMPORTAR JSON</button>
+        </div>
+        
+        <div class="btn-container">
+            <button class="btn-print" id="print-btn" onclick="printReport()">IMPRIMIR INFORME (PDF)</button>
+        </div>
+        
+        <input type="file" id="import-file-input" accept=".json" onchange="importData(event)">
+
+        <div id="points-list">
+            <label style="margin-bottom: 6px;">HISTORIAL DE TRAZABILIDAD (EDITABLE)</label>
+        </div>
+
+        <div class="summary-box">
+            <div class="summary-box-title">Resumen de Ruta Real Consolidado</div>
+            <div class="summary-grid">
+                <div class="summary-stat">
+                    <span class="summary-stat-val" id="total-km">0.0 km</span>
+                    <span class="summary-stat-lbl">Distancia Real</span>
+                </div>
+                <div class="summary-stat">
+                    <span class="summary-stat-val" id="total-time">0 min</span>
+                    <span class="summary-stat-lbl">Tiempo Conducción</span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="map-layer-control">
+        <div id="card-sat" class="layer-card active" onclick="switchLayer('sat')" style="background-image: url('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/4/6/4.png');">
+            <span>Satélite</span>
+        </div>
+        <div id="card-mapa" class="layer-card" onclick="switchLayer('mapa')" style="background-image: url('https://a.tile.openstreetmap.org/4/8/5.png');">
+            <span>Mapa</span>
+        </div>
+    </div>
+
+    <div id="map"></div>
+
+    <!-- MODAL 1: GUARDAR Y ARCHIVAR RECORRIDO -->
+    <div class="modal-overlay" id="modal-save">
+        <div class="modal-card">
+            <div class="modal-header">
+                <h3>💾 Archivar Recorrido en el Registro</h3>
+                <button class="modal-close" onclick="closeSaveModal()">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div class="input-group">
+                    <label for="save-title">TÍTULO O NOMBRE DEL RECORRIDO</label>
+                    <input type="text" id="save-title" placeholder="Ej: Control Especial A-66 León - Benavente">
+                </div>
+                <div class="input-group">
+                    <label for="save-date">FECHA DEL RECORRIDO </label>
+                    <input type="date" id="save-date">
+                </div>
+                <div class="input-group">
+                    <label for="save-notes">OBSERVACIONES / DETALLES DE LA INSPECCIÓN (OPCIONAL)</label>
+                    <textarea id="save-notes" rows="3" placeholder="Ej: Agentes participantes, número de vehículos inspeccionados, incidencias..."></textarea>
+                </div>
+                <div class="summary-box" style="margin-top: 10px;">
+                    <div class="summary-box-title">Datos que se registrarán</div>
+                    <div class="summary-grid">
+                        <div class="summary-stat">
+                            <span class="summary-stat-val" id="save-modal-points">0</span>
+                            <span class="summary-stat-lbl">Puntos de Control</span>
+                        </div>
+                        <div class="summary-stat">
+                            <span class="summary-stat-val" id="save-modal-km">0.0 km</span>
+                            <span class="summary-stat-lbl">Distancia Total</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn-undo" onclick="closeSaveModal()">Cancelar</button>
+                <button class="btn-save-main" onclick="executeSaveRoute(false)">Guardar y Mantener</button>
+                <button class="btn-add" onclick="executeSaveRoute(true)" style="grid-column:auto;">Guardar y Limpiar Mapa</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- MODAL 2: CONSULTAR HISTORIAL DE RECORRIDOS ARCHIVADOS -->
+    <div class="modal-overlay" id="modal-archive">
+        <div class="modal-card">
+            <div class="modal-header">
+                <h3>📁 Registro de Recorridos Archivados</h3>
+                <button class="modal-close" onclick="closeArchiveModal()">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div class="archive-search-bar">
+                    <input type="text" id="archive-search-text" placeholder="🔍 Buscar por título o contenido..." oninput="renderArchiveList()">
+                    <div class="archive-date-range">
+                        <div>
+                            <label for="archive-search-date-start">DESDE FECHA</label>
+                            <input type="date" id="archive-search-date-start" onchange="renderArchiveList()">
+                        </div>
+                        <div>
+                            <label for="archive-search-date-end">HASTA FECHA</label>
+                            <input type="date" id="archive-search-date-end" onchange="renderArchiveList()">
+                        </div>
+                    </div>
+                </div>
+                <div id="archive-cards-container" class="archive-list-container">
+                    <!-- Tarjetas generadas dinámicamente -->
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn-print" onclick="printArchivedList()" style="grid-column: auto; padding: 10px 16px; font-size: 12px;">🖨️ Imprimir Listado</button>
+                <button class="btn-undo" onclick="closeArchiveModal()">Cerrar</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- MODAL 3: MODIFICAR REGISTRO ARCHIVADO -->
+    <div class="modal-overlay" id="modal-edit-archive">
+        <div class="modal-card">
+            <div class="modal-header">
+                <h3>✏️ Modificar Recorrido Archivo</h3>
+                <button class="modal-close" onclick="closeEditArchiveModal()">&times;</button>
+            </div>
+            <div class="modal-body">
+                <input type="hidden" id="edit-archive-id">
+                <div class="input-group">
+                    <label for="edit-archive-title">TÍTULO O NOMBRE DEL RECORRIDO</label>
+                    <input type="text" id="edit-archive-title">
+                </div>
+                <div class="input-group">
+                    <label for="edit-archive-date">FECHA DEL RECORRIDO</label>
+                    <input type="date" id="edit-archive-date">
+                </div>
+                <div class="input-group">
+                    <label for="edit-archive-notes">OBSERVACIONES / DETALLES DE LA INSPECCIÓN</label>
+                    <textarea id="edit-archive-notes" rows="3"></textarea>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn-undo" onclick="closeEditArchiveModal()">Cancelar</button>
+                <button class="btn-save-main" onclick="executeEditArchiveSave()">Guardar Cambios</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- ZONA DE IMPRESIÓN -->
+    <div id="print-zone">
+        <div class="print-title">Informe Técnico de Trazabilidad - Inspección de Transportes León</div>
+        <div class="print-subtitle" id="print-route-title">Recorrido General</div>
+        
+        <div id="print-notes-container" class="print-notes" style="display:none;"></div>
+
+        <div class="print-summary-layout">
+            <div class="print-summary-item">
+                <div class="print-summary-val" id="print-route-date">-</div>
+                <div class="print-summary-lbl">Fecha Recorrido</div>
+            </div>
+            <div class="print-summary-item">
+                <div class="print-summary-val" id="print-total-puntos">0</div>
+                <div class="print-summary-lbl">Controles Realizados</div>
+            </div>
+            <div class="print-summary-item">
+                <div class="print-summary-val" id="print-total-km">0.0 km</div>
+                <div class="print-summary-lbl">Kilómetros Totales</div>
+            </div>
+            <div class="print-summary-item">
+                <div class="print-summary-val" id="print-total-time">0 min</div>
+                <div class="print-summary-lbl">Tiempo Est. Ruta</div>
+            </div>
+        </div>
+        <div id="snapshot-container"></div> 
+        <table class="print-table">
+            <thead>
+                <tr>
+                    <th style="width: 8%;">Orden</th>
+                    <th style="width: 42%;">Descripción / Punto de Control</th>
+                    <th style="width: 25%;">Coordenadas Geográficas</th>
+                    <th style="width: 25%;">Tramo Anterior (KM y Tiempo)</th>
+                </tr>
+            </thead>
+            <tbody id="print-table-body"></tbody>
+        </table>
+
+        <!-- ZONA DE IMPRESIÓN PARA LISTADO DE ARCHIVO -->
+        <div id="print-archive-list-zone" style="display:none;">
+            <div class="print-title" style="margin-bottom: 15px;">Listado de Recorridos Archivados - Inspección de Transportes León</div>
+            <table class="print-table">
+                <thead>
+                    <tr>
+                        <th style="width: 15%;">Fecha</th>
+                        <th style="width: 35%;">Título del Recorrido</th>
+                        <th style="width: 12%; text-align:center;">Controles</th>
+                        <th style="width: 15%; text-align:right;">Distancia</th>
+                        <th style="width: 23%;">Observaciones</th>
+                    </tr>
+                </thead>
+                <tbody id="print-archive-table-body"></tbody>
+            </table>
+        </div>
+    </div>
+
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    
+    <script>
+        // --- INICIALIZACIÓN DE FIREBASE ---
+        const firebaseConfig = {
+          apiKey: "AIzaSyBatYG7fgtozpxnI3UhI35NPLizXpAIhhw",
+          authDomain: "calescolar-4d347.firebaseapp.com",
+          databaseURL: "https://calescolar-4d347-default-rtdb.europe-west1.firebasedatabase.app",
+          projectId: "calescolar-4d347",
+          storageBucket: "calescolar-4d347.firebasestorage.app",
+          messagingSenderId: "645908876195",
+          appId: "1:645908876195:web:1a8befafa21b6d621fa816",
+          measurementId: "G-SKVCQVHLPQ"
+        };
+        firebase.initializeApp(firebaseConfig);
+        const db = firebase.database();
+        const auth = firebase.auth();
+
+        // Control local sincronizado
+        let globalArchive = [];
+        let appIniciada = false;
+
+        // --- SISTEMA DE AUTENTICACIÓN ---
+        function iniciarSesionGoogle() {
+            const provider = new firebase.auth.GoogleAuthProvider();
+            auth.signInWithPopup(provider).catch(err => alert("Error de inicio de sesión: " + err.message));
+        }
+
+        function cerrarSesion() {
+            auth.signOut().then(() => location.reload());
+        }
+
+        auth.onAuthStateChanged(user => {
+            if (user) {
+                document.getElementById('auth-overlay').style.display = 'none';
+                document.getElementById('display-user-email').innerText = user.email;
+                iniciarBaseDatosFirebase();
+            } else {
+                document.getElementById('auth-overlay').style.display = 'flex';
+                document.getElementById('display-user-email').innerText = '';
+            }
+        });
+
+        // --- CARGA DE DATOS DESDE FIREBASE ---
+        function iniciarBaseDatosFirebase() {
+            if(appIniciada) return;
+            appIniciada = true;
+
+            // Escuchar cambios en el archivo de recorridos (Sustituye a localStorage)
+            db.ref('inspecciones_transporte/archive').on('value', snap => {
+                globalArchive = snap.val() || [];
+                if (document.getElementById('modal-archive').classList.contains('active')) {
+                    renderArchiveList();
+                }
+            }, error => {
+                console.error("Permiso denegado al leer archivo. Asegúrate de que el UID está en las reglas.", error);
+                alert("No tienes permiso en la base de datos (UID no autorizado).");
+            });
+
+            // Cargar el borrador guardado (Solo se ejecuta una vez al arrancar)
+            db.ref('inspecciones_transporte/draft').once('value').then(snap => {
+                const savedData = snap.val();
+                if (savedData) {
+                    try {
+                        const points = Array.isArray(savedData) ? savedData : (savedData.points || []);
+                        if (savedData.meta) currentActiveRouteMeta = savedData.meta;
+                        if (Array.isArray(points) && points.length > 0) {
+                            points.forEach(pt => { addPosition(pt.lat, pt.lng, pt.label, false); });
+                            map.setView([points[points.length - 1].lat, points[points.length - 1].lng], 11);
+                        }
+                    } catch(e) { console.error("Error al procesar borrador:", e); }
+                }
+            }).catch(error => {
+                console.warn("No se pudo cargar el borrador o no existe:", error);
+            });
+        }
+
+
+        // --- MAPA Y LÓGICA DE LA APP ORIGINAL ---
+        const map = L.map('map', { zoomControl: false, renderer: L.canvas() }).setView([42.599023, -5.567016], 11);
+        L.control.zoom({ position: 'topright' }).addTo(map);
+
+        const googleHybrid = L.tileLayer('https://{s}.google.com/vt/lyrs=y&x={x}&y={y}&z={z}', { maxZoom: 20, subdomains: ['mt0','mt1','mt2','mt3'] });
+        const googleStreets = L.tileLayer('https://{s}.google.com/vt/lyrs=m&x={x}&y={y}&z={z}', { maxZoom: 20, subdomains: ['mt0','mt1','mt2','mt3'] });
+        googleHybrid.addTo(map);
+
+        function formatDate(dateStr) {
+            if (!dateStr) return '';
+            const parts = dateStr.split('-');
+            if (parts.length === 3) return `${parts[2]}/${parts[1]}/${parts[0]}`;
+            return dateStr;
+        }
+
+        function switchLayer(type) {
+            const cardSat = document.getElementById('card-sat');
+            const cardMapa = document.getElementById('card-mapa');
+            if (type === 'sat') {
+                if (!map.hasLayer(googleHybrid)) { map.removeLayer(googleStreets); googleHybrid.addTo(map); }
+                cardSat.classList.add('active'); cardMapa.classList.remove('active');
+            } else {
+                if (!map.hasLayer(googleStreets)) { map.removeLayer(googleHybrid); googleStreets.addTo(map); }
+                cardMapa.classList.add('active'); cardSat.classList.remove('active');
+            }
+        }
+
+        let markersData = [];
+        let idCounter = 0;
+        let globalKmsTotales = 0;
+        let globalMinutosTotales = 0;
+        let currentActiveRouteMeta = { title: "", date: "", notes: "" };
+
+        map.on('click', function(e) {
+            const lat = e.latlng.lat; const lng = e.latlng.lng;
+            const defaultLabel = "Posición " + (markersData.length + 1);
+            const popupContent = `
+                <div class="popup-click-container">
+                    <div class="popup-click-title">Nueva Inspección</div>
+                    <input type="text" id="popup-label-input" class="popup-click-input" placeholder="${defaultLabel}" autofocus>
+                    <button class="popup-click-btn" onclick="addPositionFromClick(${lat}, ${lng})">AÑADIR AQUÍ</button>
+                </div>`;
+            L.popup().setLatLng(e.latlng).setContent(popupContent).openOn(map);
+        });
+
+        function addPositionFromClick(lat, lng) {
+            const inputVal = document.getElementById('popup-label-input').value.trim();
+            const finalLabel = inputVal || ("Posición " + (markersData.length + 1));
+            map.closePopup();
+            addPosition(lat, lng, finalLabel, true);
+        }
+
+        function getMarkerColor(index, total) {
+            if (index === 0) return '#1e8e3e'; 
+            if (index === total - 1) return '#d93025'; 
+            return '#1a73e8'; 
+        }
+
+        function clearLegGraphics(item) {
+            if (item.polyline) { map.removeLayer(item.polyline); item.polyline = null; }
+            if (item.arrows && item.arrows.length > 0) {
+                item.arrows.forEach(arrow => map.removeLayer(arrow));
+                item.arrows = [];
+            }
+        }
+
+        function calculateLegRoute(index) {
+            if (index === 0) {
+                const pFirst = markersData[0];
+                clearLegGraphics(pFirst);
+                pFirst.legKm = 0; pFirst.legMin = 0; pFirst.legTxt = "";
+                const el = document.getElementById('leg-' + pFirst.id);
+                if (el) el.innerText = "";
+                recalculateTotals();
+                return;
+            }
+            
+            const pStart = markersData[index - 1];
+            const pEnd = markersData[index];
+
+            clearLegGraphics(pEnd);
+
+            const url = `https://router.project-osrm.org/route/v1/driving/${pStart.lng},${pStart.lat};${pEnd.lng},${pEnd.lat}?overview=full&geometries=geojson`;
+
+            fetch(url).then(res => res.json()).then(data => {
+                if (!markersData.find(m => m.id === pEnd.id)) return;
+                if (data.routes && data.routes.length > 0) {
+                    const route = data.routes[0];
+                    const coords = route.geometry.coordinates.map(c => [c[1], c[0]]);
+                    
+                    const distanceKm = (route.distance / 1000).toFixed(1);
+                    const durationMin = Math.round(route.duration / 60);
+                    const legText = `+ ${distanceKm} km (~${durationMin} min)`;
+
+                    pEnd.legKm = parseFloat(distanceKm);
+                    pEnd.legMin = durationMin;
+                    pEnd.legTxt = legText;
+
+                    pEnd.polyline = L.polyline(coords, { color: '#ff4a4a', weight: 5, opacity: 0.85, lineJoin: 'round' }).addTo(map);
+                    pEnd.arrows = addArrowsToPolyline(coords);
+
+                    const el = document.getElementById('leg-' + pEnd.id);
+                    if (el) el.innerText = legText;
+
+                    recalculateTotals();
+                }
+            }).catch(err => console.error("Error cargando tramo OSRM: ", err));
+        }
+
+        function addArrowsToPolyline(coords) {
+            const arrowsArray = [];
+            if (coords.length < 2) return arrowsArray;
+
+            const METERS_PER_ARROW = 5000; 
+            let accumulatedDistance = 0;
+            let lastArrowDistance = 0;
+
+            for (let i = 0; i < coords.length - 1; i++) {
+                const p1 = coords[i]; const p2 = coords[i + 1];
+                const segmentDist = haversineDistance(p1[0], p1[1], p2[0], p2[1]) * 1000; 
+                accumulatedDistance += segmentDist;
+
+                if (accumulatedDistance - lastArrowDistance >= METERS_PER_ARROW) {
+                    const angle = Math.atan2(p2[1] - p1[1], p2[0] - p1[0]) * 180 / Math.PI;
+                    const arrowSVG = `<svg width="24" height="24" viewBox="0 0 24 24" class="svg-arrow-icon" style="transform: rotate(${angle}deg);"><path d="M2,12L12,2L22,12H17V22H7V12H2Z" fill="#fff200" stroke="#000000" stroke-width="2.5" stroke-linejoin="round"/></svg>`;
+                    const arrowMarker = L.marker(p1, { icon: L.divIcon({ className: 'custom-arrow-marker', html: arrowSVG, iconSize: [24, 24], iconAnchor: [12, 12] }), interactive: false }).addTo(map);
+                    arrowsArray.push(arrowMarker);
+                    lastArrowDistance = accumulatedDistance;
+                }
+            }
+            return arrowsArray;
+        }
+
+        function haversineDistance(lat1, lon1, lat2, lon2) {
+            const R = 6371; const dLat = (lat2 - lat1) * Math.PI / 180; const dLon = (lon2 - lon1) * Math.PI / 180;
+            const a = Math.sin(dLat/2) * Math.sin(dLat/2) + Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) * Math.sin(dLon/2) * Math.sin(dLon/2);
+            return R * (2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a)));
+        }
+
+        function recalculateTotals() {
+            let totalKm = 0; let totalMin = 0;
+            markersData.forEach((item, index) => {
+                if (index > 0) { totalKm += item.legKm || 0; totalMin += item.legMin || 0; }
+            });
+            globalKmsTotales = totalKm.toFixed(1); globalMinutosTotales = totalMin;
+            document.getElementById('total-km').innerText = globalKmsTotales + " km";
+            document.getElementById('total-time').innerText = formatMinutes(globalMinutosTotales);
+        }
+
+        function updateMarkersInterface() {
+            const totalPoints = markersData.length;
+            markersData.forEach((item, index) => {
+                const color = getMarkerColor(index, totalPoints);
+                const htmlIcon = L.divIcon({
+                    className: 'custom-number-marker',
+                    html: `<div style="background-color: ${color}; width:26px; height:26px; border-radius:50%; display:flex; align-items:center; justify-content:center; border:2px solid white; box-shadow:0 2px 4px rgba(0,0,0,0.3);">${index + 1}</div>`,
+                    iconSize: [26, 26], iconAnchor: [13, 13]
+                });
+                item.marker.setIcon(htmlIcon);
+            });
+        }
+
+        function formatMinutes(mins) {
+            if(mins < 60) return mins + " min";
+            const hrs = Math.floor(mins / 60); const rem = mins % 60;
+            return rem === 0 ? `${hrs}h` : `${hrs}h ${rem}min`;
+        }
+
+        // SUSTITUCIÓN DE LOCALSTORAGE POR FIREBASE
+        function saveToFirebaseDraft() {
+            if (!auth.currentUser) return; // Si no hay sesión, no guardar
+            const dataToSave = {
+                meta: currentActiveRouteMeta,
+                points: markersData.map(item => ({ label: item.label, lat: item.lat, lng: item.lng }))
+            };
+            db.ref('inspecciones_transporte/draft').set(dataToSave).catch(e => console.error("Error guardando borrador:", e));
+        }
+
+        function addPosition(customLat = null, customLng = null, customLabel = null, triggerSave = true) {
+            let lat, lng, labelInput;
+            if (customLat !== null && customLng !== null) {
+                lat = customLat; lng = customLng; labelInput = customLabel;
+            } else {
+                const coordInput = document.getElementById('coords').value.trim();
+                labelInput = document.getElementById('label').value.trim() || ("Posición " + (markersData.length + 1));
+                const cleanCoords = coordInput.replace(/,/g, '.'); const parts = cleanCoords.split(/\s+/);
+                if (parts.length >= 2) { lat = parseFloat(parts[0]); lng = parseFloat(parts[1]); } else { alert("Introduce latitud y longitud válidas."); return; }
+            }
+
+            if (!isNaN(lat) && !isNaN(lng)) {
+                const marker = L.marker([lat, lng]).addTo(map);
+                marker.bindTooltip(labelInput, { permanent: true, direction: 'top', offset: [0, -15], className: 'map-label' }).openTooltip();
+                
+                const pointId = 'point-' + idCounter++;
+                const newLegObj = { 
+                    id: pointId, marker: marker, label: labelInput, lat: lat, lng: lng,
+                    polyline: null, arrows: [], legKm: 0, legMin: 0, legTxt: ""
+                };
+                
+                markersData.push(newLegObj);
+                map.panTo([lat, lng]);
+                createHistoryItem(pointId, labelInput, lat, lng);
+
+                if (customLat === null) { document.getElementById('coords').value = ""; document.getElementById('label').value = ""; }
+
+                updateMarkersInterface();
+                calculateLegRoute(markersData.length - 1);
+
+                if (triggerSave) saveToFirebaseDraft();
+            }
+        }
+
+        function createHistoryItem(id, name, lat, lng) {
+            const list = document.getElementById('points-list');
+            const itemContainer = document.createElement('div');
+            itemContainer.className = 'point-item'; itemContainer.id = id;
+            const currentCoordsString = `${lat} ${lng}`;
+
+            itemContainer.innerHTML = `
+                <div class="point-row">
+                    <input type="text" class="history-label-input" value="${name}" oninput="updateMarkerLabel('${id}', this.value)">
+                    <button class="btn-locate" onclick="focusMarker('${id}')">Ir</button>
+                    <button class="btn-delete-item" onclick="deletePositionById('${id}')" title="Eliminar posición">🗑️</button>
+                </div>
+                <div class="point-row">
+                    <input type="text" class="history-coords-single-input" value="${currentCoordsString}" oninput="updateMarkerPositionSingle('${id}', this.value)">
+                </div>
+                <div class="route-leg-info" id="leg-${id}"></div>
+            `;
+            list.appendChild(itemContainer);
+        }
+
+        function deletePositionById(id) {
+            const index = markersData.findIndex(item => item.id === id);
+            if (index === -1) return;
+
+            const targetData = markersData[index];
+            map.removeLayer(targetData.marker);
+            clearLegGraphics(targetData);
+
+            const elementHtml = document.getElementById(id);
+            if (elementHtml) elementHtml.remove();
+
+            markersData.splice(index, 1);
+            updateMarkersInterface();
+
+            if (markersData.length > 0) {
+                if (index === 0) calculateLegRoute(0);
+                else if (index < markersData.length) calculateLegRoute(index);
+                else recalculateTotals();
+            } else { recalculateTotals(); }
+
+            saveToFirebaseDraft();
+        }
+
+        function updateMarkerLabel(id, newText) {
+            const data = markersData.find(item => item.id === id);
+            if (data) {
+                data.label = newText;
+                if (data.marker) {
+                    data.marker.unbindTooltip();
+                    data.marker.bindTooltip(newText || " ", { permanent: true, direction: 'top', offset: [0, -15], className: 'map-label' }).openTooltip();
+                }
+                saveToFirebaseDraft();
+            }
+        }
+
+        function updateMarkerPositionSingle(id, fullStringValue) {
+            const idx = markersData.findIndex(item => item.id === id);
+            if (idx !== -1) {
+                const data = markersData[idx];
+                const cleanCoords = fullStringValue.replace(/,/g, '.').trim(); const parts = cleanCoords.split(/\s+/);
+                if (parts.length >= 2) {
+                    const newLat = parseFloat(parts[0]); const newLng = parseFloat(parts[1]);
+                    if (!isNaN(newLat) && !isNaN(newLng)) {
+                        data.lat = newLat; data.lng = newLng; data.marker.setLatLng([newLat, newLng]);
+                        calculateLegRoute(idx);
+                        if (idx + 1 < markersData.length) calculateLegRoute(idx + 1);
+                        saveToFirebaseDraft();
+                    }
+                }
+            }
+        }
+
+        function focusMarker(id) { const data = markersData.find(item => item.id === id); if (data) map.setView([data.lat, data.lng], 14); }
+
+        function removeLast() {
+            if (markersData.length > 0) {
+                const removedItem = markersData.pop();
+                map.removeLayer(removedItem.marker);
+                clearLegGraphics(removedItem);
+                
+                const list = document.getElementById('points-list');
+                if (list.lastChild && list.lastChild.id === removedItem.id) { list.removeChild(list.lastChild); } else {
+                    const el = document.getElementById(removedItem.id);
+                    if(el) el.remove();
+                }
+                updateMarkersInterface(); recalculateTotals(); saveToFirebaseDraft();
+            }
+        }
+
+        function clearScreenMap(forceSilencioso = false) {
+            markersData.forEach(item => { map.removeLayer(item.marker); clearLegGraphics(item); });
+            markersData = [];
+            const list = document.getElementById('points-list');
+            list.innerHTML = '<label style="margin-bottom: 6px;">HISTORIAL DE TRAZABILIDAD (EDITABLE)</label>';
+            document.getElementById('total-km').innerText = "0.0 km";
+            document.getElementById('total-time').innerText = "0 min";
+            
+            // BORRAR BORRADOR DE FIREBASE
+            if(auth.currentUser) db.ref('inspecciones_transporte/draft').remove();
+            
+            currentActiveRouteMeta = { title: "", date: "", notes: "" };
+        }
+
+        function confirmClearMap() {
+            if (confirm("¿Estás seguro de que deseas limpiar todo el mapa y perder el borrador actual?")) {
+                clearScreenMap(false);
+            }
+        }
+
+        /* --- MODAL 1: GUARDAR ARCHIVO --- */
+        function openSaveModal() {
+            if (markersData.length === 0) { alert("No hay posiciones en el mapa para guardar."); return; }
+            document.getElementById('save-title').value = currentActiveRouteMeta.title || "";
+            document.getElementById('save-date').value = currentActiveRouteMeta.date || new Date().toISOString().split('T')[0];
+            document.getElementById('save-notes').value = currentActiveRouteMeta.notes || "";
+            document.getElementById('save-modal-points').innerText = markersData.length;
+            document.getElementById('save-modal-km').innerText = globalKmsTotales + " km";
+            document.getElementById('modal-save').classList.add('active');
+        }
+
+        function closeSaveModal() { document.getElementById('modal-save').classList.remove('active'); }
+
+        function executeSaveRoute(clearAfterSave) {
+            const title = document.getElementById('save-title').value.trim() || "Ruta sin título";
+            const dateStr = document.getElementById('save-date').value;
+            const notes = document.getElementById('save-notes').value.trim();
+            const pointsToSave = markersData.map(m => ({ label: m.label, lat: m.lat, lng: m.lng }));
+
+            const newRecord = {
+                id: Date.now().toString(), title: title, date: dateStr, notes: notes,
+                points: pointsToSave, kms: globalKmsTotales, time: globalMinutosTotales
+            };
+
+            // Guarda asíncronamente en base de datos
+            const newArchive = [...globalArchive, newRecord];
+            if(auth.currentUser) {
+                db.ref('inspecciones_transporte/archive').set(newArchive).then(() => {
+                    closeSaveModal();
+                    if (clearAfterSave) clearScreenMap(true); 
+                    else { currentActiveRouteMeta = { title: title, date: dateStr, notes: notes }; saveToFirebaseDraft(); }
+                }).catch(e => { alert("Error al archivar en servidor"); console.error(e); });
+            }
+        }
+
+        /* --- MODAL 2: ARCHIVO HISTÓRICO --- */
+        function openArchiveModal() {
+            document.getElementById('archive-search-text').value = "";
+            document.getElementById('archive-search-date-start').value = "";
+            document.getElementById('archive-search-date-end').value = "";
+            renderArchiveList();
+            document.getElementById('modal-archive').classList.add('active');
+        }
+
+        function closeArchiveModal() { document.getElementById('modal-archive').classList.remove('active'); }
+
+        function getFilteredArchiveList() {
+            const txt = document.getElementById('archive-search-text').value.toLowerCase();
+            const dStart = document.getElementById('archive-search-date-start').value;
+            const dEnd = document.getElementById('archive-search-date-end').value;
+
+            return globalArchive.filter(rec => {
+                const matchTxt = !txt || rec.title.toLowerCase().includes(txt) || (rec.notes && rec.notes.toLowerCase().includes(txt));
+                let matchDate = true;
+                if (dStart || dEnd) {
+                    const recDate = new Date(rec.date);
+                    if (dStart) matchDate = matchDate && (recDate >= new Date(dStart));
+                    if (dEnd) matchDate = matchDate && (recDate <= new Date(dEnd));
+                }
+                return matchTxt && matchDate;
+            }).sort((a,b) => new Date(b.date) - new Date(a.date));
+        }
+
+        function renderArchiveList() {
+            const container = document.getElementById('archive-cards-container');
+            container.innerHTML = "";
+            const filtered = getFilteredArchiveList();
+
+            if (filtered.length === 0) {
+                container.innerHTML = '<div class="empty-history-msg">No se encontraron registros archivados con los filtros actuales.</div>';
+                return;
+            }
+
+            filtered.forEach(rec => {
+                const card = document.createElement('div');
+                card.className = 'archive-card';
+                card.innerHTML = `
+                    <div class="archive-card-header">
+                        <div class="archive-title">${rec.title}</div>
+                        <div class="archive-date-badge">${formatDate(rec.date)}</div>
+                    </div>
+                    <div class="archive-stats">
+                        <span><strong>${rec.points ? rec.points.length : 0}</strong> controles</span>
+                        <span><strong>${rec.kms || 0}</strong> km</span>
+                        <span><strong>${formatMinutes(rec.time || 0)}</strong> aprox</span>
+                    </div>
+                    ${rec.notes ? `<div class="archive-notes">"${rec.notes}"</div>` : ''}
+                    <div class="archive-actions">
+                        <button class="btn-undo btn-action-sm" onclick="openEditArchiveModal('${rec.id}')">✏️ Editar Info</button>
+                        <button class="btn-clear btn-action-sm" onclick="deleteArchivedRecord('${rec.id}')">🗑️ Borrar</button>
+                        <button class="btn-history-main btn-action-sm" onclick="loadRecordToMap('${rec.id}')">📂 Cargar al Mapa</button>
+                    </div>
+                `;
+                container.appendChild(card);
+            });
+        }
+
+        function deleteArchivedRecord(id) {
+            if (confirm("¿Estás seguro de eliminar este registro del archivo definitivamente?")) {
+                const newArchive = globalArchive.filter(r => r.id !== id);
+                if(auth.currentUser) {
+                    db.ref('inspecciones_transporte/archive').set(newArchive).then(() => {
+                        renderArchiveList();
+                    });
+                }
+            }
+        }
+
+        function loadRecordToMap(id) {
+            const rec = globalArchive.find(r => r.id === id);
+            if (!rec) return;
+
+            if (markersData.length > 0) {
+                if (!confirm("Esto reemplazará el recorrido actual en pantalla. ¿Continuar?")) return;
+            }
+
+            clearScreenMap(true);
+            currentActiveRouteMeta = { title: rec.title, date: rec.date, notes: rec.notes || "" };
+
+            if (rec.points && rec.points.length > 0) {
+                rec.points.forEach(pt => { addPosition(pt.lat, pt.lng, pt.label, false); });
+                map.setView([rec.points[rec.points.length - 1].lat, rec.points[rec.points.length - 1].lng], 11);
+                saveToFirebaseDraft();
+            }
+            closeArchiveModal();
+        }
+
+        /* --- MODAL 3: EDITAR REGISTRO --- */
+        function openEditArchiveModal(id) {
+            const rec = globalArchive.find(r => r.id === id);
+            if (!rec) return;
+            document.getElementById('edit-archive-id').value = rec.id;
+            document.getElementById('edit-archive-title').value = rec.title;
+            document.getElementById('edit-archive-date').value = rec.date;
+            document.getElementById('edit-archive-notes').value = rec.notes || "";
+            document.getElementById('modal-edit-archive').classList.add('active');
+        }
+
+        function closeEditArchiveModal() { document.getElementById('modal-edit-archive').classList.remove('active'); }
+
+        function executeEditArchiveSave() {
+            const id = document.getElementById('edit-archive-id').value;
+            const updatedArchive = globalArchive.map(rec => {
+                if(rec.id === id) {
+                    return { ...rec, 
+                        title: document.getElementById('edit-archive-title').value.trim(),
+                        date: document.getElementById('edit-archive-date').value,
+                        notes: document.getElementById('edit-archive-notes').value.trim()
+                    };
+                }
+                return rec;
+            });
+            
+            if(auth.currentUser) {
+                db.ref('inspecciones_transporte/archive').set(updatedArchive).then(() => {
+                    closeEditArchiveModal(); renderArchiveList();
+                });
+            }
+        }
+
+        /* --- IMPRESIÓN --- */
+        function printReport() {
+            if (markersData.length === 0) { alert("No hay posiciones para imprimir."); return; }
+
+            const snapshotContainer = document.getElementById('snapshot-container');
+            snapshotContainer.innerHTML = '';
+            
+            html2canvas(document.getElementById('map'), { useCORS: true, allowTaint: false, logging: false }).then(canvas => {
+                const imgData = canvas.toDataURL('image/png');
+                const img = document.createElement('img');
+                img.src = imgData; img.className = 'print-map-snapshot';
+                snapshotContainer.appendChild(img);
+
+                const tableBody = document.getElementById('print-table-body');
+                tableBody.innerHTML = '';
+                markersData.forEach((item, index) => {
+                    const tr = document.createElement('tr');
+                    tr.innerHTML = `<td>${index + 1}</td><td><strong>${item.label}</strong></td><td>${item.lat.toFixed(6)}, ${item.lng.toFixed(6)}</td><td>${index === 0 ? '--- (Origen)' : item.legTxt}</td>`;
+                    tableBody.appendChild(tr);
+                });
+
+                document.getElementById('print-total-puntos').innerText = markersData.length;
+                document.getElementById('print-total-km').innerText = globalKmsTotales + " km";
+                document.getElementById('print-total-time').innerText = formatMinutes(globalMinutosTotales);
+
+                document.getElementById('print-route-title').innerText = currentActiveRouteMeta.title || "Recorrido en curso";
+                document.getElementById('print-route-date').innerText = currentActiveRouteMeta.date ? formatDate(currentActiveRouteMeta.date) : formatDate(new Date().toISOString().split('T')[0]);
+                
+                const notesContainer = document.getElementById('print-notes-container');
+                if (currentActiveRouteMeta.notes) { notesContainer.innerText = "Observaciones: " + currentActiveRouteMeta.notes; notesContainer.style.display = 'block'; }
+                else { notesContainer.style.display = 'none'; }
+
+                document.getElementById('print-archive-list-zone').style.display = 'none';
+                window.print();
+            });
+        }
+
+        function printArchivedList() {
+            const filtered = getFilteredArchiveList();
+            if (filtered.length === 0) { alert("No hay registros filtrados para imprimir."); return; }
+
+            const tableBody = document.getElementById('print-archive-table-body');
+            tableBody.innerHTML = '';
+            filtered.forEach(rec => {
+                const tr = document.createElement('tr');
+                tr.innerHTML = `<td>${formatDate(rec.date)}</td><td><strong>${rec.title}</strong></td><td style="text-align:center;">${rec.points ? rec.points.length : 0}</td><td style="text-align:right;">${rec.kms || 0} km</td><td>${rec.notes || '-'}</td>`;
+                tableBody.appendChild(tr);
+            });
+
+            document.getElementById('snapshot-container').innerHTML = '';
+            document.getElementById('print-table-body').innerHTML = '';
+            document.querySelector('.print-title').style.display = 'none';
+            document.querySelector('.print-subtitle').style.display = 'none';
+            document.querySelector('.print-summary-layout').style.display = 'none';
+            document.getElementById('print-notes-container').style.display = 'none';
+            document.querySelector('.print-table:not(#print-archive-list-zone .print-table)').style.display = 'none';
+            
+            document.getElementById('print-archive-list-zone').style.display = 'block';
+
+            window.print();
+            
+            setTimeout(() => {
+                document.querySelector('.print-title').style.display = 'block';
+                document.querySelector('.print-subtitle').style.display = 'block';
+                document.querySelector('.print-summary-layout').style.display = 'flex';
+                document.querySelector('.print-table').style.display = 'table';
+                document.getElementById('print-archive-list-zone').style.display = 'none';
+            }, 1000);
+        }
+
+        /* --- EXPORTAR / IMPORTAR --- */
+        function exportData() {
+            // Obtenemos los datos desde la nube en tiempo real para exportar una copia sólida
+            db.ref('inspecciones_transporte').once('value').then(snap => {
+                const serverData = snap.val() || { archive: [], draft: null };
+                const blob = new Blob([JSON.stringify(serverData, null, 2)], { type: "application/json" });
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement("a");
+                a.href = url; a.download = "backup_rutas_gps_firebase.json";
+                a.click(); URL.revokeObjectURL(url);
+            }).catch(e => { alert("Error exportando base de datos"); console.error(e); });
+        }
+
+        function triggerImport() { document.getElementById('import-file-input').click(); }
+
+        function importData(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                try {
+                    const data = JSON.parse(e.target.result);
+                    if (data && typeof data === 'object') {
+                        if(auth.currentUser) {
+                            if(confirm("Importar sobreescribirá los datos actuales en Firebase. ¿Continuar?")) {
+                                db.ref('inspecciones_transporte').set({
+                                    archive: data.archive || [],
+                                    draft: data.draft || null
+                                }).then(() => {
+                                    alert("Datos importados y subidos a la nube correctamente.");
+                                    location.reload();
+                                });
+                            }
+                        }
+                    } else { alert("Archivo inválido."); }
+                } catch(err) { alert("Error al procesar JSON."); console.error(err); }
+            };
+            reader.readAsText(file);
+            event.target.value = '';
+        }
+
+    </script>
+</body>
+</html>
