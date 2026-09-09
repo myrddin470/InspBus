@@ -585,7 +585,7 @@
             appIniciada = true;
 
             // Escuchar cambios en el archivo de recorridos (Sustituye a localStorage)
-            db.ref('inspecciones_transporte/archive').on('value', snap => {
+            db.ref('mapa_rutas_gps/archive').on('value', snap => {
                 globalArchive = snap.val() || [];
                 if (document.getElementById('modal-archive').classList.contains('active')) {
                     renderArchiveList();
@@ -596,7 +596,7 @@
             });
 
             // Cargar el borrador guardado (Solo se ejecuta una vez al arrancar)
-            db.ref('inspecciones_transporte/draft').once('value').then(snap => {
+            db.ref('mapa_rutas_gps/draft').once('value').then(snap => {
                 const savedData = snap.val();
                 if (savedData) {
                     try {
@@ -789,7 +789,7 @@
                 meta: currentActiveRouteMeta,
                 points: markersData.map(item => ({ label: item.label, lat: item.lat, lng: item.lng }))
             };
-            db.ref('inspecciones_transporte/draft').set(dataToSave).catch(e => console.error("Error guardando borrador:", e));
+            db.ref('mapa_rutas_gps/draft').set(dataToSave).catch(e => console.error("Error guardando borrador:", e));
         }
 
         function addPosition(customLat = null, customLng = null, customLabel = null, triggerSave = true) {
@@ -924,7 +924,7 @@
             document.getElementById('total-time').innerText = "0 min";
             
             // BORRAR BORRADOR DE FIREBASE
-            if(auth.currentUser) db.ref('inspecciones_transporte/draft').remove();
+            if(auth.currentUser) db.ref('mapa_rutas_gps/draft').remove();
             
             currentActiveRouteMeta = { title: "", date: "", notes: "" };
         }
@@ -962,7 +962,7 @@
             // Guarda asíncronamente en base de datos
             const newArchive = [...globalArchive, newRecord];
             if(auth.currentUser) {
-                db.ref('inspecciones_transporte/archive').set(newArchive).then(() => {
+                db.ref('mapa_rutas_gps/archive').set(newArchive).then(() => {
                     closeSaveModal();
                     if (clearAfterSave) clearScreenMap(true); 
                     else { currentActiveRouteMeta = { title: title, date: dateStr, notes: notes }; saveToFirebaseDraft(); }
@@ -1036,7 +1036,7 @@
             if (confirm("¿Estás seguro de eliminar este registro del archivo definitivamente?")) {
                 const newArchive = globalArchive.filter(r => r.id !== id);
                 if(auth.currentUser) {
-                    db.ref('inspecciones_transporte/archive').set(newArchive).then(() => {
+                    db.ref('mapa_rutas_gps/archive').set(newArchive).then(() => {
                         renderArchiveList();
                     });
                 }
@@ -1089,7 +1089,7 @@
             });
             
             if(auth.currentUser) {
-                db.ref('inspecciones_transporte/archive').set(updatedArchive).then(() => {
+                db.ref('mapa_rutas_gps/archive').set(updatedArchive).then(() => {
                     closeEditArchiveModal(); renderArchiveList();
                 });
             }
@@ -1168,7 +1168,7 @@
         /* --- EXPORTAR / IMPORTAR --- */
         function exportData() {
             // Obtenemos los datos desde la nube en tiempo real para exportar una copia sólida
-            db.ref('inspecciones_transporte').once('value').then(snap => {
+            db.ref('mapa_rutas_gps').once('value').then(snap => {
                 const serverData = snap.val() || { archive: [], draft: null };
                 const blob = new Blob([JSON.stringify(serverData, null, 2)], { type: "application/json" });
                 const url = URL.createObjectURL(blob);
@@ -1190,7 +1190,7 @@
                     if (data && typeof data === 'object') {
                         if(auth.currentUser) {
                             if(confirm("Importar sobreescribirá los datos actuales en Firebase. ¿Continuar?")) {
-                                db.ref('inspecciones_transporte').set({
+                                db.ref('mapa_rutas_gps').set({
                                     archive: data.archive || [],
                                     draft: data.draft || null
                                 }).then(() => {
