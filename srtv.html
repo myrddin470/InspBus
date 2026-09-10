@@ -48,6 +48,8 @@
         .utility-bar span { color: var(--primary-dark); font-size: 11px; font-weight: 700; letter-spacing: 0.5px; }
         .utility-bar button { background: white; color: var(--primary-dark); border: 1px solid var(--border-color); padding: 4px 10px; font-size: 11px; border-radius: 4px; cursor: pointer; transition: 0.2s; font-weight: 600; }
         .utility-bar button:hover { background: var(--primary-light); border-color: var(--primary-dark); }
+        .utility-bar .btn-logout { background: #fff1f2; color: var(--danger-color); border-color: #fecaca; }
+        .utility-bar .btn-logout:hover { background: var(--danger-color); color: white; border-color: var(--danger-color); }
 
         /* Cabecera del Panel */
         .app-header { padding: 15px; background: white; border-bottom: 1px solid var(--border-color); text-align: center; }
@@ -140,12 +142,13 @@
 
     <!-- PANEL PRINCIPAL -->
     <div class="sidebar">
-        <!-- Barra superior para JSON -->
+        <!-- Barra utilidades superior con botón de salida -->
         <div class="utility-bar">
             <span>COPIA DE SEGURIDAD</span>
             <div style="display: flex; gap: 5px;">
-                <button onclick="document.getElementById('file-import').click()">📂 Importar</button>
-                <button onclick="exportarJSON()">💾 Exportar</button>
+                <button onclick="document.getElementById('file-import').click()" title="Importar JSON">📂 Importar</button>
+                <button onclick="exportarJSON()" title="Exportar JSON">💾 Exportar</button>
+                <button onclick="cerrarSesion()" class="btn-logout" title="Cerrar sesión y cambiar de usuario">🚪 Salir</button>
                 <input type="file" id="file-import" style="display:none" accept=".json" onchange="importarJSON(event)">
             </div>
         </div>
@@ -362,7 +365,7 @@
             }
         });
 
-        // AUTENTICACIÓN
+        // AUTENTICACIÓN Y SESIÓN
         function iniciarSesion() {
             const e = document.getElementById('login-email').value;
             const p = document.getElementById('login-password').value;
@@ -371,6 +374,15 @@
                 document.getElementById('login-error').style.display = 'block';
             });
         }
+
+        function cerrarSesion() {
+            auth.signOut().then(() => {
+                // El observador onAuthStateChanged restablece y muestra el overlay de inicio de sesión automáticamente
+            }).catch(err => {
+                console.error("Error al cerrar sesión:", err);
+            });
+        }
+
         auth.onAuthStateChanged(user => {
             if (user) { document.getElementById('auth-overlay').style.display = 'none'; escucharBaseDatos(); } 
             else { document.getElementById('auth-overlay').style.display = 'flex'; }
