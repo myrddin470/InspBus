@@ -76,7 +76,7 @@
         .hijuela-card { border: 1px solid var(--border-color); padding: 12px; border-radius: 8px; margin-bottom: 10px; cursor: pointer; transition: all 0.2s ease; background: #fafafa; }
         .hijuela-card:hover { border-color: var(--primary-color); box-shadow: 0 4px 12px rgba(59, 130, 246, 0.08); background: white; }
         .hijuela-card.active { border: 2px solid var(--primary-color); background: #eff6ff; }
-        .hijuela-title { font-weight: 700; font-size: 14px; color: var(--primary-dark); margin-bottom: 4px; display: flex; justify-content: space-between; align-items: center; }
+        .hijuela-title { font-weight: 700; font-size: 14px; color: var(--primary-dark); margin-bottom: 4px; display: flex; align-items: center; }
         .hijuela-info { font-size: 12px; color: var(--text-muted); }
 
         /* Panel de Edición */
@@ -264,6 +264,20 @@
         </div>
     </div>
 
+    <!-- MODAL EDITAR HIJUELA -->
+    <div id="modal-editar-hijuela" class="modal">
+        <div class="modal-content">
+            <h3>Modificar Nombre de la Hijuela</h3>
+            <label>Nombre de la Hijuela</label>
+            <input type="text" id="edit-hijuela-nombre" placeholder="Nombre de la hijuela">
+            
+            <div class="btn-row" style="margin-top: 20px; margin-bottom: 0;">
+                <button class="btn-outline" style="flex: 1;" onclick="cerrarModal('modal-editar-hijuela')">Cancelar</button>
+                <button class="btn-primary" style="flex: 1;" onclick="actualizarHijuelaActual()">Guardar Cambios</button>
+            </div>
+        </div>
+    </div>
+
     <!-- Leaflet JS -->
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 
@@ -282,6 +296,7 @@
 
         let datosFirebase = {}; 
         let lineaActivaId = null;
+        let hijuelaActivaId = null;
         let hijuelasSeleccionadas = new Set();
         let puntosActuales = []; 
         let ultimaDistanciaKm = "0.0";
@@ -466,13 +481,13 @@
                         <div style="flex: 1;">
                             <div class="hijuela-title">
                                 <span>📌 ${hijuela.nombre}</span>
-                                <span style="font-size: 11px; padding: 2px 6px; border-radius: 4px; background: ${isSelected ? 'var(--primary-color)' : '#e2e8f0'}; color: ${isSelected ? 'white' : 'var(--text-muted)'};">
-                                    ${isSelected ? 'Seleccionada' : 'Oculta'}
-                                </span>
                             </div>
                             <div class="hijuela-info">🛑 ${paradasCount} paradas registradas &nbsp;|&nbsp; 🛣️ ${km} km trazados</div>
                         </div>
-                        <button class="btn-danger" style="padding: 5px 8px; font-size: 11px; margin-left: 8px;" onclick="borrarHijuela(event, '${hKey}')" title="Borrar Hijuela">🗑️</button>
+                        <div style="display: flex; gap: 4px; margin-left: 8px;">
+                            <button class="btn-outline" style="padding: 5px 8px; font-size: 11px; background: white;" onclick="abrirModalEditarHijuela(event, '${hKey}')" title="Modificar Nombre de la Hijuela">✏️</button>
+                            <button class="btn-danger" style="padding: 5px 8px; font-size: 11px;" onclick="borrarHijuela(event, '${hKey}')" title="Borrar Hijuela">🗑️</button>
+                        </div>
                     </div>
                 `;
                 container.appendChild(div);
@@ -590,7 +605,6 @@
             
             const targetIndex = parseInt(targetItem.dataset.index);
             if (draggedIndex !== null && draggedIndex !== targetIndex) {
-                // Reordenar array de puntos
                 const movedItem = puntosActuales.splice(draggedIndex, 1)[0];
                 puntosActuales.splice(targetIndex, 0, movedItem);
                 
@@ -791,6 +805,28 @@
                 document.getElementById('editor-panel').style.display = 'block';
                 renderizarListaParadas();
                 dibujarTrazadoEnMapa();
+            });
+        }
+
+        function abrirModalEditarHijuela(event, hKey) {
+            event.stopPropagation();
+            if (!lineaActivaId || !datosFirebase[lineaActivaId] || !datosFirebase[lineaActivaId].hijuelas || !datosFirebase[lineaActivaId].hijuelas[hKey]) return;
+            hijuelaActivaId = hKey;
+            const hijuela = datosFirebase[lineaActivaId].hijuelas[hKey];
+            document.getElementById('edit-hijuela-nombre').value = hijuela.nombre || '';
+            document.getElementById('modal-editar-hijuela').classList.add('open');
+        }
+
+        function actualizarHijuelaActual() {
+            if (!lineaActivaId || !hijuelaActivaId) return;
+            const nombre = document.getElementById('edit-hijuela-nombre').value.trim();
+            if (!nombre) { alert("El nombre de la hijuela es obligatorio."); return; }
+
+            db.ref(`${DB_NODE}/${lineaActivaId}/hijuelas/${hijuelaActivaId}`).update({
+                nombre: nombre
+            }).then(() => {
+                cerrarModal('modal-editar-hijuela');
+                hijuelaActivaId = null;
             });
         }
 
