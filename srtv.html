@@ -6,6 +6,7 @@
     <title>Líneas Regulares de Viajeros - Inspección de Transportes</title>
     
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-auth.js"></script>
@@ -73,13 +74,6 @@
         .btn-danger:hover { background: var(--danger-color); color: white; }
         .btn-outline { background: white; border: 1px solid var(--border-color); color: var(--text-main); }
         .btn-outline:hover { background: var(--primary-light); border-color: var(--primary-dark); }
-
-        /* Tarjetas de Hijuelas */
-        .hijuela-card { border: 1px solid var(--border-color); padding: 12px; border-radius: 8px; margin-bottom: 10px; cursor: pointer; transition: all 0.2s ease; background: #fafafa; }
-        .hijuela-card:hover { border-color: var(--primary-color); box-shadow: 0 4px 12px rgba(59, 130, 246, 0.08); background: white; }
-        .hijuela-card.active { border: 2px solid var(--primary-color); background: #eff6ff; }
-        .hijuela-title { font-weight: 700; font-size: 14px; color: var(--primary-dark); margin-bottom: 4px; display: flex; align-items: center; }
-        .hijuela-info { font-size: 12px; color: var(--text-muted); }
 
         /* Panel de Edición */
         #editor-panel { margin-top: 15px; padding-top: 15px; border-top: 2px dashed var(--border-color); display: none; }
@@ -485,20 +479,34 @@
                 const isSelected = hijuelasSeleccionadas.has(hKey);
 
                 const div = document.createElement('div');
-                div.className = `hijuela-card ${isSelected ? 'active' : ''}`;
+                div.className = `bg-white rounded-xl shadow-sm p-3 mb-2.5 cursor-pointer transition-all border ${isSelected ? 'border-2 border-blue-500 bg-blue-50/50' : 'border-gray-200 hover:border-blue-400 hover:shadow-md'} flex flex-col justify-between`;
                 div.onclick = () => toggleSeleccionHijuela(hKey);
 
                 div.innerHTML = `
-                    <div style="display:flex; justify-content: space-between; align-items: start;">
-                        <div style="flex: 1;">
-                            <div class="hijuela-title">
-                                <span>📌 ${hijuela.nombre}</span>
-                            </div>
-                            <div class="hijuela-info">🛑 ${paradasCount} paradas registradas &nbsp;|&nbsp; 🛣️ ${km} km trazados</div>
+                    <!-- Nombre de la hijuela ocupando todo el ancho -->
+                    <div class="w-full mb-2">
+                        <h3 class="text-sm font-bold text-slate-800 leading-tight">📌 ${hijuela.nombre}</h3>
+                    </div>
+
+                    <!-- Línea inferior con paradas, km trazados y botones a la derecha -->
+                    <div class="flex items-center justify-between pt-2 border-t border-gray-100 text-xs text-slate-500 mt-auto">
+                        <div class="flex items-center space-x-3">
+                            <span class="flex items-center gap-1">
+                                🛑 <span>${paradasCount} paradas</span>
+                            </span>
+                            <span class="flex items-center gap-1">
+                                🛣️ <span>${km} km</span>
+                            </span>
                         </div>
-                        <div style="display: flex; gap: 4px; margin-left: 8px;">
-                            <button class="btn-outline" style="padding: 5px 8px; font-size: 11px; background: white;" onclick="abrirModalEditarHijuela(event, '${hKey}')" title="Modificar Nombre de la Hijuela">✏️</button>
-                            <button class="btn-danger" style="padding: 5px 8px; font-size: 11px;" onclick="borrarHijuela(event, '${hKey}')" title="Borrar Hijuela">🗑️</button>
+
+                        <!-- Botones de editar y borrar alineados a la derecha -->
+                        <div class="flex items-center space-x-1" onclick="event.stopPropagation()">
+                            <button onclick="abrirModalEditarHijuela(event, '${hKey}')" class="p-1.5 text-slate-500 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors" title="Modificar Nombre de la Hijuela">
+                                ✏️
+                            </button>
+                            <button onclick="borrarHijuela(event, '${hKey}')" class="p-1.5 text-slate-500 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors" title="Borrar Hijuela">
+                                🗑️
+                            </button>
                         </div>
                     </div>
                 `;
