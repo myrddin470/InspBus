@@ -3,1038 +3,779 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Líneas Regulares de Viajeros - Inspección de Transportes León</title>
+    <title>Líneas Regulares de Viajeros - Inspección de Transportes</title>
     
-    <!-- Leaflet CSS -->
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
-    
-    <!-- FIREBASE SDK (Compat v8) -->
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-auth.js"></script>
 
     <style>
         :root {
-            --primary-color: #1a73e8;
-            --primary-dark: #1557b0;
-            --accent-color: #f2994a;
-            --danger-color: #d93025;
-            --success-color: #1e8e3e;
-            --dark-bg: #202124;
-            --sidebar-bg: rgba(255, 255, 255, 0.97);
-            --card-border: #dadce0;
+            /* Paleta Pastel Profesional y Atractiva */
+            --primary-dark: #334155;    /* Gris Pizarra Oscuro */
+            --primary-color: #3b82f6;   /* Azul Suave Profesional */
+            --primary-light: #f1f5f9;   /* Fondo Neutro Muy Suave */
+            --accent-color: #10b981;    /* Verde Menta Suave */
+            --danger-color: #f43f5e;    /* Coral / Rojo Suave */
+            --bg-light: #f8fafc;        /* Fondo General Gris Cálido */
+            --border-color: #cbd5e1;    /* Borde Discreto */
+            --text-main: #1e293b;       /* Texto Principal Nítido */
+            --text-muted: #64748b;      /* Texto Secundario Apagado */
         }
 
-        body, html {
-            margin: 0;
-            padding: 0;
-            height: 100%;
-            font-family: 'Segoe UI', Roboto, Tahoma, Geneva, Verdana, sans-serif;
-            overflow: hidden;
-            background-color: #f8f9fa;
-        }
+        body, html { margin: 0; padding: 0; height: 100%; font-family: 'Segoe UI', system-ui, -apple-system, sans-serif; overflow: hidden; background-color: var(--bg-light); }
+        #map { height: 100vh; width: 100vw; z-index: 1; }
 
-        #map {
-            height: 100vh;
-            width: 100vw;
-            z-index: 1;
-        }
+        /* Autenticación */
+        #auth-overlay { position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: var(--bg-light); z-index: 9999; display: flex; align-items: center; justify-content: center; }
+        .auth-card { background: white; padding: 40px; border-radius: 12px; box-shadow: 0 10px 25px rgba(0,0,0,0.08); width: 340px; text-align: center; border: 1px solid var(--border-color); }
+        .auth-card h3 { color: var(--primary-dark); margin-top: 0; margin-bottom: 20px; font-size: 20px; }
+        .auth-card input { width: 100%; padding: 12px; margin-bottom: 15px; border: 1px solid var(--border-color); border-radius: 6px; box-sizing: border-box; font-size: 14px; transition: border-color 0.2s; background: #fafafa; }
+        .auth-card input:focus { border-color: var(--primary-color); outline: none; background: white; }
+        .auth-card button { width: 100%; padding: 12px; background: var(--primary-color); color: white; border: none; border-radius: 6px; font-weight: 600; font-size: 15px; cursor: pointer; transition: 0.2s; }
+        .auth-card button:hover { background: #2563eb; }
 
-        /* Overlay Autenticación */
-        #auth-overlay {
-            position: fixed;
-            top: 0; left: 0; width: 100vw; height: 100vh;
-            background: #f8f9fa;
-            z-index: 9999;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            flex-direction: column;
-        }
-        .auth-card {
-            background: white; padding: 40px; border-radius: 12px;
-            box-shadow: 0 4px 20px rgba(0,0,0,0.12); border: 1px solid var(--card-border);
-            max-width: 400px; width: 90%; text-align: center;
-        }
-
-        /* Cabecera Superior */
-        .app-header {
-            position: absolute;
-            top: 15px;
-            right: 110px;
-            z-index: 1000;
-            background: white;
-            padding: 10px 22px;
-            border-radius: 25px;
-            box-shadow: 0 2px 8px rgba(0,0,0,0.2);
-            font-weight: 700;
-            color: #202124;
-            text-transform: uppercase;
-            letter-spacing: 0.8px;
-            font-size: 12px;
-            border: 1px solid var(--card-border);
-            display: flex;
-            align-items: center;
-            gap: 12px;
-        }
-        .user-controls {
-            display: flex; align-items: center; gap: 10px;
-            border-left: 1px solid var(--card-border); padding-left: 12px; margin-left: 5px;
-        }
-        .user-email { font-size: 11px; color: var(--primary-color); font-weight: bold; text-transform: lowercase; }
-
-        /* Panel Lateral Principal */
+        /* Panel Lateral (Ampliado y Estilizado) */
         .sidebar {
-            position: absolute;
-            top: 15px;
-            left: 15px;
-            width: 410px;
-            background: var(--sidebar-bg);
-            z-index: 1000;
-            border-radius: 10px;
-            box-shadow: 0 4px 16px rgba(0,0,0,0.25);
-            padding: 18px;
-            max-height: 94vh;
-            display: flex;
-            flex-direction: column;
-            border: 1px solid var(--card-border);
-            box-sizing: border-box;
+            position: absolute; top: 15px; left: 15px; width: 420px; max-height: 94vh;
+            background: white; z-index: 1000; border-radius: 12px; box-shadow: 0 10px 30px rgba(0,0,0,0.1);
+            display: flex; flex-direction: column; overflow: hidden; border: 1px solid var(--border-color);
         }
 
-        .sidebar-title-zone {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            margin-bottom: 12px;
-            padding-bottom: 8px;
-            border-bottom: 2px solid #e8eaed;
-        }
-        .sidebar-title { font-size: 14px; font-weight: 800; color: #202124; text-transform: uppercase; letter-spacing: 0.5px; }
+        /* Barra Utilidades Superior */
+        .utility-bar { background: #e2e8f0; padding: 8px 15px; display: flex; justify-content: space-between; align-items: center; border-top-left-radius: 12px; border-top-right-radius: 12px; border-bottom: 1px solid var(--border-color); }
+        .utility-bar span { color: var(--primary-dark); font-size: 11px; font-weight: 700; letter-spacing: 0.5px; }
+        .utility-bar button { background: white; color: var(--primary-dark); border: 1px solid var(--border-color); padding: 4px 10px; font-size: 11px; border-radius: 4px; cursor: pointer; transition: 0.2s; font-weight: 600; }
+        .utility-bar button:hover { background: var(--primary-light); border-color: var(--primary-dark); }
 
-        /* Controles de Formulario */
-        .input-group { margin-bottom: 10px; }
-        label { display: block; font-size: 11px; color: #5f6368; margin-bottom: 4px; font-weight: 700; letter-spacing: 0.4px; }
-        input, select, textarea {
-            width: 100%; padding: 9px 10px; border: 1px solid var(--card-border);
-            border-radius: 6px; box-sizing: border-box; font-size: 13px; color: #202124; font-family: inherit;
-        }
-        input:focus, select:focus, textarea:focus { outline: none; border-color: var(--primary-color); box-shadow: 0 0 0 2px rgba(26,115,232,0.2); }
+        /* Cabecera del Panel */
+        .app-header { padding: 15px; background: white; border-bottom: 1px solid var(--border-color); text-align: center; }
+        .app-header h2 { margin: 0; font-size: 18px; color: var(--primary-dark); font-weight: 700; display: flex; align-items: center; justify-content: center; gap: 8px; }
+        .app-header p { margin: 5px 0 0 0; font-size: 12px; color: var(--text-muted); font-weight: 500; text-transform: uppercase; letter-spacing: 0.5px; }
 
-        /* Buscador Geocoder */
-        .geocoder-container { position: relative; margin-bottom: 10px; }
-        .geocoder-results {
-            position: absolute; top: 100%; left: 0; right: 0; background: white;
-            border: 1px solid var(--card-border); border-radius: 0 0 6px 6px;
-            max-height: 160px; overflow-y: auto; z-index: 1005; box-shadow: 0 4px 8px rgba(0,0,0,0.12); display: none;
-        }
-        .geocoder-result-item { padding: 8px 12px; font-size: 12px; cursor: pointer; border-bottom: 1px solid #f1f3f4; }
-        .geocoder-result-item:hover { background-color: #f8f9fa; color: var(--primary-color); font-weight: bold; }
+        .panel-header { padding: 15px; background: var(--primary-light); border-bottom: 1px solid var(--border-color); }
+        .panel-body { padding: 15px; overflow-y: auto; flex-grow: 1; background: white; }
 
-        /* Botones Generales */
-        .btn-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 10px; }
-        button {
-            padding: 9px 12px; border: none; border-radius: 6px; cursor: pointer;
-            font-weight: 700; font-size: 12px; transition: all 0.2s ease;
-            display: inline-flex; align-items: center; justify-content: center; gap: 6px;
-        }
-        button:active { transform: scale(0.98); }
-
-        .btn-primary { background-color: var(--primary-color); color: white; }
-        .btn-primary:hover { background-color: var(--primary-dark); }
-        .btn-success { background-color: var(--success-color); color: white; }
-        .btn-success:hover { background-color: #137333; }
-        .btn-danger { background-color: #fce8e6; color: var(--danger-color); border: 1px solid #f9d2ce; }
-        .btn-danger:hover { background-color: #f9d2ce; }
-        .btn-secondary { background-color: #f1f3f4; color: #3c4043; border: 1px solid #dadce0; }
-        .btn-secondary:hover { background-color: #e8eaed; }
-        .btn-dark { background-color: var(--dark-bg); color: white; }
-        .btn-dark:hover { background-color: #000; }
-
-        /* Árbol de Líneas e Hijuelas */
-        .lines-list-container {
-            overflow-y: auto; flex-grow: 1; max-height: 480px; padding-right: 4px; margin-top: 5px;
-        }
-        .line-card {
-            border: 1px solid var(--card-border); border-radius: 8px; background: white;
-            margin-bottom: 10px; overflow: hidden; transition: border-color 0.2s, box-shadow 0.2s;
-        }
-        .line-card:hover { border-color: var(--primary-color); box-shadow: 0 2px 6px rgba(26,115,232,0.12); }
-        .line-card-header {
-            padding: 10px 12px; background: #fafafa; border-bottom: 1px solid #f1f3f4;
-            display: flex; justify-content: space-between; align-items: center; cursor: pointer;
-        }
-        .line-badge {
-            background: #e8f0fe; color: var(--primary-color); font-weight: 800; font-size: 12px;
-            padding: 4px 8px; border-radius: 4px; border: 1px solid #c2e7ff;
-        }
-        .line-title-text { font-size: 13px; font-weight: 700; color: #202124; flex-grow: 1; margin-left: 10px; }
-        .hijuelas-container { padding: 8px; background: #fff; display: none; border-top: 1px solid #f1f3f4; }
-        .hijuelas-container.open { display: block; }
+        label { display: block; font-size: 11px; font-weight: 700; color: var(--text-muted); text-transform: uppercase; margin-bottom: 6px; letter-spacing: 0.5px; }
+        select, input[type="text"] { width: 100%; padding: 10px; border: 1px solid var(--border-color); border-radius: 6px; font-size: 14px; margin-bottom: 15px; box-sizing: border-box; background: white; transition: border 0.2s; color: var(--text-main); }
+        select:focus, input[type="text"]:focus { outline: none; border-color: var(--primary-color); }
         
-        .hijuela-item {
-            padding: 8px 10px; border-radius: 6px; border: 1px solid #e8eaed; margin-bottom: 6px;
-            background: #f8f9fa; display: flex; justify-content: space-between; align-items: center; cursor: pointer;
-            transition: background 0.15s;
-        }
-        .hijuela-item:hover { background: #e8f0fe; border-color: #c2e7ff; }
-        .hijuela-item.active { background: #d2e3fc; border-color: var(--primary-color); font-weight: bold; }
-        .hijuela-name { font-size: 12px; color: #202124; }
-        .hijuela-stats { font-size: 10px; color: #5f6368; font-family: monospace; }
+        .btn-row { display: flex; gap: 10px; margin-bottom: 15px; }
+        button { padding: 10px 15px; font-size: 13px; font-weight: 600; border: none; border-radius: 6px; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 6px; transition: 0.2s; }
+        .btn-primary { background: var(--primary-color); color: white; }
+        .btn-primary:hover { background: #2563eb; }
+        .btn-success { background: var(--accent-color); color: white; }
+        .btn-success:hover { background: #059669; }
+        .btn-danger { background: #fee2e2; color: var(--danger-color); border: 1px solid #fecaca; }
+        .btn-danger:hover { background: var(--danger-color); color: white; }
+        .btn-outline { background: white; border: 1px solid var(--border-color); color: var(--text-main); }
+        .btn-outline:hover { background: var(--primary-light); border-color: var(--primary-dark); }
 
-        /* Editor de Hijuela Trazado */
-        #editor-panel { display: none; border-top: 2px solid var(--primary-color); padding-top: 12px; margin-top: 8px; }
-        .stop-point-row {
-            display: flex; align-items: center; gap: 6px; margin-bottom: 6px; background: white;
-            padding: 6px; border-radius: 6px; border: 1px solid var(--card-border);
-        }
-        .stop-number {
-            width: 20px; height: 20px; border-radius: 50%; background: var(--primary-color); color: white;
-            font-size: 10px; font-weight: bold; display: flex; align-items: center; justify-content: center; flex-shrink: 0;
-        }
+        /* Tarjetas de Hijuelas */
+        .hijuela-card { border: 1px solid var(--border-color); padding: 12px; border-radius: 8px; margin-bottom: 10px; cursor: pointer; transition: all 0.2s ease; background: #fafafa; }
+        .hijuela-card:hover { border-color: var(--primary-color); box-shadow: 0 4px 12px rgba(59, 130, 246, 0.08); background: white; }
+        .hijuela-card.active { border: 2px solid var(--primary-color); background: #eff6ff; }
+        .hijuela-title { font-weight: 700; font-size: 14px; color: var(--primary-dark); margin-bottom: 4px; display: flex; justify-content: space-between; align-items: center; }
+        .hijuela-info { font-size: 12px; color: var(--text-muted); }
 
-        /* Resumen de Ruta */
-        .summary-box { background-color: #f8f9fa; border: 1px solid var(--card-border); border-radius: 6px; padding: 10px; margin-top: 10px; }
-        .summary-grid { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 6px; text-align: center; }
-        .summary-val { font-size: 14px; font-weight: 800; color: var(--primary-color); }
-        .summary-lbl { font-size: 9px; color: #5f6368; text-transform: uppercase; }
+        /* Panel de Edición */
+        #editor-panel { margin-top: 15px; padding-top: 15px; border-top: 2px dashed var(--border-color); display: none; }
+        .info-box { background: #e0f2fe; color: #0369a1; padding: 12px; font-size: 13px; border-radius: 8px; margin-bottom: 15px; border: 1px solid #bae6fd; font-weight: 500; }
+        .stop-item { display: flex; align-items: center; justify-content: space-between; padding: 8px; border-bottom: 1px solid #f1f5f9; font-size: 13px; background: white; gap: 8px; }
+        .stop-item:last-child { border-bottom: none; }
+        .stop-item .number { background: var(--primary-color); color: white; border-radius: 50%; width: 22px; height: 22px; display: inline-flex; justify-content: center; align-items: center; font-size: 11px; font-weight: bold; flex-shrink: 0; }
+        .stop-name-input { border: 1px solid transparent; background: transparent; font-size: 13px; color: var(--text-main); font-weight: 500; width: 100%; padding: 4px; border-radius: 4px; transition: 0.2s; }
+        .stop-name-input:hover { border-color: var(--border-color); background: #fafafa; }
+        .stop-name-input:focus { border-color: var(--primary-color); background: white; outline: none; }
 
-        /* Selectores de Capa Mapa */
-        .map-layer-control { position: absolute; bottom: 25px; right: 20px; z-index: 1000; display: flex; gap: 8px; }
-        .layer-card {
-            width: 65px; height: 65px; border-radius: 8px; border: 2px solid white;
-            box-shadow: 0 2px 6px rgba(0,0,0,0.3); cursor: pointer; position: relative; overflow: hidden;
-            background-size: cover; background-position: center; transition: transform 0.2s;
-        }
-        .layer-card:hover { transform: scale(1.05); }
-        .layer-card.active { border-color: var(--primary-color); box-shadow: 0 0 0 2px var(--primary-color); }
-        .layer-card span {
-            position: absolute; bottom: 0; left: 0; right: 0; background: rgba(255, 255, 255, 0.92);
-            color: #202124; font-size: 9px; font-weight: 800; text-align: center; padding: 2px 0; text-transform: uppercase;
-        }
+        /* Buscador de Localidades (Mapa) */
+        .search-container { position: absolute; top: 15px; right: 15px; z-index: 1000; width: 320px; background: white; border-radius: 8px; box-shadow: 0 4px 20px rgba(0,0,0,0.08); border: 1px solid var(--border-color); }
+        .search-input-wrapper { display: flex; align-items: center; padding: 5px 12px; }
+        .search-input-wrapper input { border: none; outline: none; width: 100%; padding: 10px 5px; font-size: 14px; margin: 0; background: transparent; }
+        .search-suggestions { max-height: 250px; overflow-y: auto; border-top: 1px solid var(--border-color); display: none; background: white; border-bottom-left-radius: 8px; border-bottom-right-radius: 8px; }
+        .suggestion-item { padding: 10px 12px; font-size: 13px; cursor: pointer; border-bottom: 1px solid #f1f5f9; color: var(--text-main); }
+        .suggestion-item:hover { background: var(--primary-light); color: var(--primary-dark); }
+        .suggestion-item:last-child { border-bottom: none; }
 
-        /* Marcadores Leaflet Personalizados */
-        .custom-stop-badge {
-            display: flex; align-items: center; justify-content: center; border-radius: 50%;
-            color: white; font-weight: bold; font-size: 11px; box-shadow: 0 2px 6px rgba(0,0,0,0.4); border: 2px solid white;
-        }
-        .map-label {
-            background: white !important; border: 1px solid #202124 !important; color: #202124 !important;
-            font-weight: 800 !important; border-radius: 4px !important; padding: 2px 6px !important;
-            font-size: 11px !important; box-shadow: 0 2px 5px rgba(0,0,0,0.25);
-        }
+        /* Controles Mapa */
+        .map-layer-control { position: absolute; bottom: 25px; right: 25px; z-index: 1000; background: white; padding: 6px 10px; border-radius: 8px; box-shadow: 0 4px 20px rgba(0,0,0,0.08); border: 1px solid var(--border-color); }
+        .map-label { background: white; border: 1px solid var(--primary-dark); color: var(--primary-dark); font-weight: bold; font-size: 12px; padding: 3px 8px; border-radius: 6px; box-shadow: 0 2px 6px rgba(0,0,0,0.15); }
 
         /* Modales */
-        .modal-overlay {
-            position: fixed; top: 0; left: 0; width: 100vw; height: 100vh;
-            background: rgba(32, 33, 36, 0.6); backdrop-filter: blur(3px); z-index: 2000;
-            display: flex; align-items: center; justify-content: center; opacity: 0; pointer-events: none; transition: opacity 0.2s ease;
-        }
-        .modal-overlay.active { opacity: 1; pointer-events: auto; }
-        .modal-card {
-            background: #ffffff; width: 90%; max-width: 540px; max-height: 88vh;
-            border-radius: 12px; box-shadow: 0 12px 32px rgba(0,0,0,0.25); display: flex; flex-direction: column; overflow: hidden;
-        }
-        .modal-header { padding: 14px 18px; background: #f8f9fa; border-bottom: 1px solid var(--card-border); display: flex; justify-content: space-between; align-items: center; }
-        .modal-header h3 { margin: 0; font-size: 14px; color: #202124; font-weight: 800; text-transform: uppercase; }
-        .modal-close { background: transparent; border: none; font-size: 20px; cursor: pointer; color: #5f6368; }
-        .modal-body { padding: 18px; overflow-y: auto; flex-grow: 1; }
-        .modal-footer { padding: 12px 18px; background: #f8f9fa; border-top: 1px solid var(--card-border); display: flex; justify-content: flex-end; gap: 8px; }
-
-        /* Estilos de Impresión */
-        #print-zone { display: none; }
-        @media print {
-            body, html { overflow: visible !important; height: auto !important; background: white !important; }
-            .sidebar, .app-header, #map, .leaflet-control-zoom, .map-layer-control, .modal-overlay, #auth-overlay { display: none !important; }
-            #print-zone { display: block !important; width: 100% !important; padding: 10px; }
-            .print-map-snapshot { width: 100% !important; max-height: 380px; object-fit: contain; border: 1px solid var(--card-border); margin-bottom: 15px; }
-            .print-title { font-size: 16px; font-weight: 800; text-align: center; text-transform: uppercase; margin-bottom: 4px; }
-            .print-subtitle { font-size: 13px; font-weight: 700; text-align: center; color: var(--primary-color); border-bottom: 2px solid #202124; padding-bottom: 6px; margin-bottom: 12px; }
-            .print-table { width: 100%; border-collapse: collapse; margin-top: 10px; }
-            .print-table th, .print-table td { border: 1px solid var(--card-border); padding: 6px 10px; text-align: left; font-size: 11px; }
-            .print-table th { background-color: #f8f9fa !important; }
-        }
+        .modal { display: none; position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: rgba(51, 65, 85, 0.4); z-index: 2000; align-items: center; justify-content: center; backdrop-filter: blur(2px); }
+        .modal.open { display: flex; }
+        .modal-content { background: white; width: 450px; padding: 25px; border-radius: 12px; box-shadow: 0 15px 35px rgba(0,0,0,0.15); border: 1px solid var(--border-color); }
+        .modal-content h3 { margin-top: 0; margin-bottom: 20px; font-size: 18px; color: var(--primary-dark); border-bottom: 2px solid var(--primary-light); padding-bottom: 10px; }
     </style>
 </head>
 <body>
 
-    <!-- OVERLAY DE AUTENTICACIÓN FIREBASE -->
+    <!-- OVERLAY FIREBASE -->
     <div id="auth-overlay">
         <div class="auth-card">
-            <h2 style="margin-top: 0; color: #202124; font-size: 18px;">Líneas Regulares de Viajeros</h2>
-            <p style="color: #5f6368; font-size: 12px; margin-bottom: 20px;">Acceso restringido a la Sección de Inspección de Transportes de León.</p>
-            
-            <div class="input-group" style="text-align: left;">
-                <label for="login-email">CORREO ELECTRÓNICO</label>
-                <input type="email" id="login-email" placeholder="usuario@ejemplo.com">
-            </div>
-            
-            <div class="input-group" style="text-align: left;">
-                <label for="login-password">CONTRASEÑA</label>
-                <input type="password" id="login-password" placeholder="••••••••">
-            </div>
-
-            <button class="btn-primary" style="width: 100%; margin-top: 10px; padding: 11px;" onclick="iniciarSesionEmail()">Acceder al Sistema</button>
-            <div id="login-error" style="color: var(--danger-color); font-size: 12px; margin-top: 12px; display: none; font-weight: bold;"></div>
+            <h3>Seguridad y Acceso</h3>
+            <input type="email" id="login-email" placeholder="Correo electrónico">
+            <input type="password" id="login-password" placeholder="Contraseña">
+            <button onclick="iniciarSesion()">Acceder al Sistema</button>
+            <p id="login-error" style="color:var(--danger-color); font-size:13px; display:none; margin-top:15px; font-weight:500;"></p>
         </div>
     </div>
 
-    <!-- CABECERA DE APLICACIÓN -->
-    <div class="app-header">
-        <span>LÍNEAS REGULARES DE TRANSPORTE DE VIAJEROS - INSPECCIÓN DE TRANSPORTES LEÓN</span>
-        <div class="user-controls">
-            <span class="user-email" id="display-user-email"></span>
-            <button class="btn-danger" style="padding: 4px 8px; font-size: 10px;" onclick="cerrarSesion()">Cerrar Sesión</button>
+    <!-- BUSCADOR DE LOCALIDADES (SOBRE EL MAPA) -->
+    <div class="search-container">
+        <div class="search-input-wrapper">
+            <span style="font-size: 16px; color: var(--text-muted);">🔍</span>
+            <input type="text" id="map-search" placeholder="Buscar localidad (Ej: León, Ponferrada)..." oninput="buscarLocalidad()">
         </div>
+        <div id="search-suggestions" class="search-suggestions"></div>
     </div>
 
-    <!-- PANEL LATERAL -->
+    <!-- PANEL PRINCIPAL -->
     <div class="sidebar">
-        <div class="sidebar-title-zone">
-            <span class="sidebar-title">🚍 Catálogo de Líneas</span>
-            <button class="btn-success" style="padding: 6px 10px; font-size: 11px;" onclick="openLineModal()">+ Nueva Línea</button>
+        <!-- Barra superior para JSON -->
+        <div class="utility-bar">
+            <span>COPIA DE SEGURIDAD</span>
+            <div style="display: flex; gap: 5px;">
+                <button onclick="document.getElementById('file-import').click()">📂 Importar</button>
+                <button onclick="exportarJSON()">💾 Exportar</button>
+                <input type="file" id="file-import" style="display:none" accept=".json" onchange="importarJSON(event)">
+            </div>
         </div>
 
-        <!-- Buscador de Filtro en Árbol -->
-        <div class="input-group">
-            <input type="text" id="filter-lines-input" placeholder="🔍 Buscar concesión (Ej: VACL-012, Astorga)..." oninput="renderLinesTree()">
+        <!-- Cabecera Visual -->
+        <div class="app-header">
+            <h2>🚌 Inspección de Transportes</h2>
+            <p>Gestor de Rutas y Líneas Regulares</p>
         </div>
 
-        <!-- Vista Árbol: Líneas e Hijuelas -->
-        <div id="lines-tree-container" class="lines-list-container">
-            <!-- Cargado dinámicamente desde Firebase -->
+        <div class="panel-header">
+            <label>SELECCIONAR LÍNEA REGULAR (VACL / AECL)</label>
+            <div style="display: flex; gap: 8px;">
+                <select id="select-linea" onchange="onLineaChange()" style="flex:1; margin-bottom: 0;">
+                    <option value="">-- Elige una línea --</option>
+                </select>
+                <button class="btn-primary" onclick="abrirModalLinea()" title="Crear Nueva Línea" style="padding: 10px;">➕</button>
+                <button class="btn-outline" id="btn-editar-linea" onclick="abrirModalEditarLinea()" title="Modificar Datos de la Línea" style="display:none; padding: 10px; background: white;">✏️</button>
+                <button class="btn-danger" id="btn-borrar-linea" onclick="borrarLinea()" title="Borrar Línea" style="display:none; padding: 10px;">🗑️</button>
+            </div>
+            
+            <button id="btn-add-hijuela" class="btn-outline" style="width: 100%; display: none; margin-top: 15px;" onclick="abrirModalHijuela()">
+                ➕ Añadir Nueva Hijuela a esta Línea
+            </button>
         </div>
 
-        <!-- PANEL EDITOR DE HIJUELA (TRAZADO GPS) -->
-        <div id="editor-panel">
-            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
-                <strong style="font-size: 12px; color: var(--primary-color);" id="editor-hijuela-title">Editando Trazado</strong>
-                <button class="btn-danger" style="padding: 3px 6px; font-size: 10px;" onclick="closeEditor()">Cerrar Editor</button>
+        <div class="panel-body">
+            <div id="hijuelas-container">
+                <p style="font-size: 13px; color: var(--text-muted); text-align: center; margin-top: 30px; font-style: italic;">
+                    Selecciona una línea en el desplegable superior para cargar sus datos y trazados.
+                </p>
             </div>
 
-            <!-- Buscador de Localidades Nominatim -->
-            <div class="input-group geocoder-container">
-                <label>AÑADIR POBLACIÓN / BUSCAR EN MAPA</label>
-                <input type="text" id="search-locality" placeholder="Ej: León, Astorga, Ponferrada..." autocomplete="off" oninput="buscarLocalidad(this.value)">
-                <div id="geocoder-results" class="geocoder-results"></div>
-            </div>
-
-            <div class="input-group">
-                <label>AÑADIR POR COORDENADAS GPS Y NOMBRE</label>
-                <div style="display: flex; gap: 6px; margin-bottom: 4px;">
-                    <input type="text" id="editor-point-coords" placeholder="Lat Lng (ej: 42.599 -5.567)">
-                    <input type="text" id="editor-point-label" placeholder="Población / Parada">
+            <div id="editor-panel">
+                <div class="info-box">
+                    <strong>📍 Modo de Trazado Activo</strong><br>
+                    Haz clic en el mapa o busca una localidad arriba a la derecha para añadir paradas a la ruta. Puedes editar el nombre de cada parada directamente en la lista.
                 </div>
-                <button class="btn-secondary" style="width: 100%; padding: 6px; font-size: 11px;" onclick="addPointFromInputs()">+ Añadir Punto GPS</button>
-            </div>
-
-            <div style="font-size: 11px; color: #5f6368; font-style: italic; margin-bottom: 8px;">
-                💡 <em>También puedes hacer clic directamente sobre el mapa para marcar puntos del recorrido.</em>
-            </div>
-
-            <label>PARADAS Y POBLACIONES DE LA HIJUELA</label>
-            <div id="editor-stops-list" style="max-height: 160px; overflow-y: auto; margin-bottom: 8px;">
-                <!-- Lista editable -->
-            </div>
-
-            <button class="btn-success" style="width: 100%; padding: 10px; font-size: 12px;" onclick="saveActiveHijuelaRoute()">💾 Guardar Trazado de Hijuela</button>
-        </div>
-
-        <!-- RESUMEN DE LA HIJUELA SELECCIONADA -->
-        <div class="summary-box" id="active-summary-box" style="display: none;">
-            <div style="font-size: 10px; font-weight: 800; color: #202124; text-transform: uppercase; margin-bottom: 6px; border-bottom: 1px solid #dadce0; padding-bottom: 4px;">
-                Resumen de la Hijuela Seleccionada
-            </div>
-            <div class="summary-grid">
-                <div>
-                    <div class="summary-val" id="summary-stops-count">0</div>
-                    <div class="summary-lbl">Paradas</div>
+                
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+                    <label style="margin:0;">PUNTOS DE PARADA / ITINERARIO</label>
+                    <span id="km-text" style="font-size: 13px; font-weight: 800; color: var(--primary-color);">0.0 km</span>
                 </div>
-                <div>
-                    <div class="summary-val" id="summary-km">0.0 km</div>
-                    <div class="summary-lbl">Distancia</div>
-                </div>
-                <div>
-                    <div class="summary-val" id="summary-time">0 min</div>
-                    <div class="summary-lbl">Tiempo Est.</div>
+                
+                <div id="stops-list" style="max-height: 220px; overflow-y: auto; margin-bottom: 15px; border: 1px solid var(--border-color); border-radius: 6px; background: white;"></div>
+
+                <div class="btn-row" style="margin-bottom: 5px;">
+                    <button class="btn-success" style="flex: 1;" onclick="guardarTrazadoHijuela()">💾 Guardar Ruta</button>
+                    <button class="btn-danger" onclick="limpiarTrazadoCompleto()">Borrar Ruta</button>
                 </div>
             </div>
         </div>
-
-        <!-- BOTONES DE ACCIÓN SECUNDARIOS -->
-        <div class="btn-grid" style="margin-top: 12px;">
-            <button class="btn-secondary" onclick="exportJSON()">Exportar Backup JSON</button>
-            <button class="btn-secondary" onclick="triggerImport()">Importar JSON</button>
-        </div>
-        <button class="btn-dark" style="width: 100%;" onclick="printHijuelaReport()">🖨️ Imprimir Informe de Ruta (PDF)</button>
-        <input type="file" id="import-file-input" accept=".json" style="display: none;" onchange="importJSON(event)">
     </div>
 
-    <!-- SELECTOR DE CAPA DE MAPA -->
+    <!-- CONTROL DE CAPAS -->
     <div class="map-layer-control">
-        <div id="card-sat" class="layer-card active" onclick="switchLayer('sat')" style="background-image: url('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/4/6/4.png');">
-            <span>Satélite</span>
-        </div>
-        <div id="card-mapa" class="layer-card" onclick="switchLayer('mapa')" style="background-image: url('https://a.tile.openstreetmap.org/4/8/5.png');">
-            <span>Mapa</span>
-        </div>
+        <select id="layer-select" onchange="cambiarCapaMapa()" style="margin: 0; border: none; font-size: 13px; font-weight: 600; outline: none; padding: 2px; color: var(--text-main); background: transparent;">
+            <option value="mapa">Vista Mapa / Callejero</option>
+            <option value="satelite">Vista Satélite / Híbrido</option>
+        </select>
     </div>
 
-    <!-- CONTENEDOR DEL MAPA -->
     <div id="map"></div>
 
-    <!-- MODAL 1: CREAR / EDITAR LÍNEA -->
-    <div class="modal-overlay" id="modal-line">
-        <div class="modal-card">
-            <div class="modal-header">
-                <h3 id="modal-line-title">Nueva Línea Regular</h3>
-                <button class="modal-close" onclick="closeLineModal()">&times;</button>
-            </div>
-            <div class="modal-body">
-                <input type="hidden" id="modal-line-id">
-                <div class="input-group">
-                    <label for="modal-line-code">DENOMINACIÓN / CÓDIGO CONCESIÓN</label>
-                    <input type="text" id="modal-line-code" placeholder="Ej: VACL-012 o AECL-005">
-                </div>
-                <div class="input-group">
-                    <label for="modal-line-name">TÍTULO / TRAYECTO PRINCIPAL</label>
-                    <input type="text" id="modal-line-name" placeholder="Ej: León - Astorga - Ponferrada con Hijuelas">
-                </div>
-                <div class="input-group">
-                    <label for="modal-line-company">EMPRESA CONCESIONARIA</label>
-                    <input type="text" id="modal-line-company" placeholder="Ej: Empresa de Transportes S.A.">
-                </div>
-                <div class="input-group">
-                    <label for="modal-line-notes">OBSERVACIONES DE LA LÍNEA</label>
-                    <textarea id="modal-line-notes" rows="3" placeholder="Detalles o características de la concesión..."></textarea>
-                </div>
-            </div>
-            <div class="modal-footer">
-                <button class="btn-secondary" onclick="closeLineModal()">Cancelar</button>
-                <button class="btn-success" onclick="saveLineFromModal()">Guardar Línea</button>
+    <!-- MODAL NUEVA LÍNEA -->
+    <div id="modal-linea" class="modal">
+        <div class="modal-content">
+            <h3>Crear Nueva Línea Regular</h3>
+            <label>Código (Ej: VACL-010)</label>
+            <input type="text" id="input-linea-codigo" placeholder="Introduce el código oficial">
+            
+            <label>Denominación (Ruta principal)</label>
+            <input type="text" id="input-linea-denominacion" placeholder="Ej: León - Ponferrada">
+            
+            <label>Empresa Concesionaria</label>
+            <input type="text" id="input-linea-empresa" placeholder="Nombre de la empresa">
+            
+            <div class="btn-row" style="margin-top: 20px; margin-bottom: 0;">
+                <button class="btn-outline" style="flex: 1;" onclick="cerrarModal('modal-linea')">Cancelar</button>
+                <button class="btn-primary" style="flex: 1;" onclick="guardarNuevaLinea()">Guardar Línea</button>
             </div>
         </div>
     </div>
 
-    <!-- MODAL 2: CREAR HIJUELA -->
-    <div class="modal-overlay" id="modal-hijuela">
-        <div class="modal-card">
-            <div class="modal-header">
-                <h3>Nueva Hijuela para la Línea</h3>
-                <button class="modal-close" onclick="closeHijuelaModal()">&times;</button>
-            </div>
-            <div class="modal-body">
-                <input type="hidden" id="modal-hijuela-line-id">
-                <div class="input-group">
-                    <label for="modal-hijuela-code">CÓDIGO / DENOMINACIÓN DE HIJUELA</label>
-                    <input type="text" id="modal-hijuela-code" placeholder="Ej: Hijuela 1 o H1">
-                </div>
-                <div class="input-group">
-                    <label for="modal-hijuela-name">TRAYECTO DE LA HIJUELA</label>
-                    <input type="text" id="modal-hijuela-name" placeholder="Ej: León - Astorga por N-120">
-                </div>
-            </div>
-            <div class="modal-footer">
-                <button class="btn-secondary" onclick="closeHijuelaModal()">Cancelar</button>
-                <button class="btn-success" onclick="saveHijuelaFromModal()">Crear Hijuela y Trazar</button>
+    <!-- MODAL EDITAR LÍNEA -->
+    <div id="modal-editar-linea" class="modal">
+        <div class="modal-content">
+            <h3>Modificar Datos de la Línea</h3>
+            <label>Código</label>
+            <input type="text" id="edit-linea-codigo" placeholder="Código oficial">
+            
+            <label>Denominación (Ruta principal)</label>
+            <input type="text" id="edit-linea-denominacion" placeholder="Denominación">
+            
+            <label>Empresa Concesionaria</label>
+            <input type="text" id="edit-linea-empresa" placeholder="Empresa">
+            
+            <div class="btn-row" style="margin-top: 20px; margin-bottom: 0;">
+                <button class="btn-outline" style="flex: 1;" onclick="cerrarModal('modal-editar-linea')">Cancelar</button>
+                <button class="btn-primary" style="flex: 1;" onclick="actualizarLineaActual()">Guardar Cambios</button>
             </div>
         </div>
     </div>
 
-    <!-- CONTENEDOR DE IMPRESIÓN PDF -->
-    <div id="print-zone">
-        <div class="print-title">Informe Técnico de Trazado - Líneas Regulares de Viajeros</div>
-        <div class="print-subtitle" id="print-hijuela-title">Línea VACL-012 - Hijuela León - Astorga</div>
-        <div id="snapshot-container"></div>
-        <table class="print-table">
-            <thead>
-                <tr>
-                    <th style="width: 10%;">Orden</th>
-                    <th style="width: 45%;">Población / Punto de Parada</th>
-                    <th style="width: 25%;">Coordenadas GPS</th>
-                    <th style="width: 20%;">Tramo Anterior</th>
-                </tr>
-            </thead>
-            <tbody id="print-table-body"></tbody>
-        </table>
+    <!-- MODAL HIJUELA -->
+    <div id="modal-hijuela" class="modal">
+        <div class="modal-content">
+            <h3>Añadir Nueva Hijuela</h3>
+            <label>Nombre de la Hijuela</label>
+            <input type="text" id="input-hijuela-nombre" placeholder="Ej: Hijuela por Hospital de Órbigo">
+            
+            <div class="btn-row" style="margin-top: 20px; margin-bottom: 0;">
+                <button class="btn-outline" style="flex: 1;" onclick="cerrarModal('modal-hijuela')">Cancelar</button>
+                <button class="btn-primary" style="flex: 1;" onclick="guardarNuevaHijuela()">Guardar Hijuela</button>
+            </div>
+        </div>
     </div>
 
     <!-- Leaflet JS -->
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 
     <script>
-        // --- CONFIGURACIÓN E INICIALIZACIÓN FIREBASE ---
+        // CONFIGURACIÓN FIREBASE
         const firebaseConfig = {
           apiKey: "AIzaSyBatYG7fgtozpxnI3UhI35NPLizXpAIhhw",
           authDomain: "calescolar-4d347.firebaseapp.com",
           databaseURL: "https://calescolar-4d347-default-rtdb.europe-west1.firebasedatabase.app",
-          projectId: "calescolar-4d347",
-          storageBucket: "calescolar-4d347.firebasestorage.app",
-          messagingSenderId: "645908876195",
-          appId: "1:645908876195:web:9465d7fd02a87fda1fa816",
-          measurementId: "G-MC109PEQ2B"
+          projectId: "calescolar-4d347"
         };
         firebase.initializeApp(firebaseConfig);
         const db = firebase.database();
         const auth = firebase.auth();
+        const DB_NODE = 'lineas_regulares_viajeros';
 
-        // Estado Global de la Aplicación
-        let dbLines = {}; // Estructura sincronizada con Firebase
-        let activeLineId = null;
-        let activeHijuelaId = null;
-        let currentEditingStops = []; // Paradas temporales en edición
+        let datosFirebase = {}; 
+        let lineaActivaId = null;
+        let hijuelasSeleccionadas = new Set();
+        let puntosActuales = []; 
+        let ultimaDistanciaKm = "0.0";
+
+        // INICIALIZACIÓN MAPA
+        const map = L.map('map', { zoomControl: false }).setView([42.598, -5.567], 9);
+        L.control.zoom({ position: 'bottomleft' }).addTo(map);
+        
+        const googleSat = L.tileLayer('https://{s}.google.com/vt/lyrs=y&x={x}&y={y}&z={z}', { maxZoom: 20, subdomains: ['mt0','mt1','mt2','mt3'] });
+        const googleMap = L.tileLayer('https://{s}.google.com/vt/lyrs=m&x={x}&y={y}&z={z}', { maxZoom: 20, subdomains: ['mt0','mt1','mt2','mt3'] });
+        
+        googleMap.addTo(map);
+
         let mapMarkers = [];
-        let mapPolyline = null;
-        let mapArrows = [];
+        let mapPolylines = [];
 
-        // NODO EXCLUSIVO DE FIREBASE PARA ESTA APP
-        const FIREBASE_NODE = 'lineas_regulares_viajeros';
-
-        // --- AUTENTICACIÓN ---
-        function iniciarSesionEmail() {
-            const email = document.getElementById('login-email').value.trim();
-            const password = document.getElementById('login-password').value;
-            const errorDiv = document.getElementById('login-error');
-
-            if (!email || !password) {
-                errorDiv.innerText = "Introduce correo y contraseña.";
-                errorDiv.style.display = 'block';
-                return;
-            }
-
-            auth.signInWithEmailAndPassword(email, password)
-                .then(() => { errorDiv.style.display = 'none'; })
-                .catch(err => {
-                    errorDiv.innerText = "Error de acceso: " + err.message;
-                    errorDiv.style.display = 'block';
-                });
+        function cambiarCapaMapa() {
+            const val = document.getElementById('layer-select').value;
+            if(val === 'satelite') { map.removeLayer(googleMap); googleSat.addTo(map); }
+            else { map.removeLayer(googleSat); googleMap.addTo(map); }
         }
 
-        function cerrarSesion() { auth.signOut().then(() => location.reload()); }
-
-        auth.onAuthStateChanged(user => {
-            if (user) {
-                document.getElementById('auth-overlay').style.display = 'none';
-                document.getElementById('display-user-email').innerText = user.email;
-                iniciarSincronizacionFirebase();
-            } else {
-                document.getElementById('auth-overlay').style.display = 'flex';
-                document.getElementById('display-user-email').innerText = '';
-            }
-        });
-
-        function iniciarSincronizacionFirebase() {
-            db.ref(FIREBASE_NODE).on('value', snap => {
-                dbLines = snap.val() || {};
-                renderLinesTree();
-                if (activeLineId && activeHijuelaId) {
-                    displayHijuelaOnMap(activeLineId, activeHijuelaId);
-                }
-            }, err => {
-                console.error("Error leyendo Firebase:", err);
-                alert("No tienes permisos suficientes en el nodo " + FIREBASE_NODE + ".");
-            });
-        }
-
-        // --- MAPA LEAFLET ---
-        const map = L.map('map', { zoomControl: false }).setView([42.599023, -5.567016], 10);
-        L.control.zoom({ position: 'topright' }).addTo(map);
-
-        const googleHybrid = L.tileLayer('https://{s}.google.com/vt/lyrs=y&x={x}&y={y}&z={z}', { maxZoom: 20, subdomains: ['mt0','mt1','mt2','mt3'] });
-        const googleStreets = L.tileLayer('https://{s}.google.com/vt/lyrs=m&x={x}&y={y}&z={z}', { maxZoom: 20, subdomains: ['mt0','mt1','mt2','mt3'] });
-        googleHybrid.addTo(map);
-
-        function switchLayer(type) {
-            const cardSat = document.getElementById('card-sat');
-            const cardMapa = document.getElementById('card-mapa');
-            if (type === 'sat') {
-                if (!map.hasLayer(googleHybrid)) { map.removeLayer(googleStreets); googleHybrid.addTo(map); }
-                cardSat.classList.add('active'); cardMapa.classList.remove('active');
-            } else {
-                if (!map.hasLayer(googleStreets)) { map.removeLayer(googleHybrid); googleStreets.addTo(map); }
-                cardMapa.classList.add('active'); cardSat.classList.remove('active');
-            }
-        }
-
-        // Clic en el mapa para añadir puntos cuando el editor está abierto
-        map.on('click', function(e) {
-            const editorPanel = document.getElementById('editor-panel');
-            if (editorPanel.style.display === 'block') {
-                const lat = e.latlng.lat;
-                const lng = e.latlng.lng;
-                const defaultLabel = "Parada " + (currentEditingStops.length + 1);
-                
-                const popupContent = `
-                    <div style="padding:4px; min-width:160px;">
-                        <div style="font-size:11px; font-weight:bold; color:#5f6368; margin-bottom:5px;">AÑADIR POBLACIÓN</div>
-                        <input type="text" id="popup-stop-name" placeholder="${defaultLabel}" style="width:100%; padding:5px; font-size:12px; margin-bottom:6px; box-sizing:border-box;">
-                        <button class="btn-primary" style="width:100%; padding:6px; font-size:11px;" onclick="addPointFromMapClick(${lat}, ${lng})">Confirmar Punto</button>
-                    </div>`;
-                L.popup().setLatLng(e.latlng).setContent(popupContent).openOn(map);
-            }
-        });
-
-        function addPointFromMapClick(lat, lng) {
-            const nameInput = document.getElementById('popup-stop-name').value.trim();
-            const label = nameInput || ("Parada " + (currentEditingStops.length + 1));
-            map.closePopup();
-            
-            currentEditingStops.push({ nombre: label, lat: lat, lng: lng });
-            renderEditorStopsList();
-            drawCurrentEditorRoute();
-        }
-
-        // --- RENDERIZADO DEL ÁRBOLES DE LÍNEAS E HIJUELAS ---
-        function renderLinesTree() {
-            const container = document.getElementById('lines-tree-container');
-            const filterText = document.getElementById('filter-lines-input').value.toLowerCase().trim();
-            container.innerHTML = "";
-
-            const lineKeys = Object.keys(dbLines);
-            if (lineKeys.length === 0) {
-                container.innerHTML = `<div style="text-align:center; color:#5f6368; font-size:12px; padding:20px 10px;">No existen líneas guardadas. Haz clic en <strong>+ Nueva Línea</strong> para comenzar.</div>`;
-                return;
-            }
-
-            lineKeys.forEach(key => {
-                const line = dbLines[key];
-                const lineCode = line.codigo || "S/C";
-                const lineName = line.nombre || "Sin denominación";
-                const hijuelasObj = line.hijuelas || {};
-                const hijuelaKeys = Object.keys(hijuelasObj);
-
-                // Filtro de búsqueda
-                const matchLine = lineCode.toLowerCase().includes(filterText) || lineName.toLowerCase().includes(filterText);
-                const matchHijuelas = hijuelaKeys.some(hk => (hijuelasObj[hk].nombre || "").toLowerCase().includes(filterText));
-
-                if (filterText && !matchLine && !matchHijuelas) return;
-
-                const lineCard = document.createElement('div');
-                lineCard.className = 'line-card';
-                
-                const isExpanded = (activeLineId === key) || (filterText.length > 0);
-
-                lineCard.innerHTML = `
-                    <div class="line-card-header" onclick="toggleLineAccordion('${key}')">
-                        <span class="line-badge">${lineCode}</span>
-                        <span class="line-title-text">${lineName}</span>
-                        <span style="font-size:11px; color:#5f6368; font-weight:bold;">${hijuelaKeys.length} hij.</span>
-                    </div>
-                    <div class="hijuelas-container ${isExpanded ? 'open' : ''}" id="hijuelas-for-${key}">
-                        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px; padding:0 2px;">
-                            <span style="font-size:10px; font-weight:bold; color:#5f6368; text-transform:uppercase;">Hijuelas de la Línea</span>
-                            <div>
-                                <button class="btn-secondary" style="padding:2px 6px; font-size:10px;" onclick="openEditLineModal('${key}')">✏️ Editar Línea</button>
-                                <button class="btn-success" style="padding:2px 6px; font-size:10px;" onclick="openHijuelaModal('${key}')">+ Hijuela</button>
-                            </div>
-                        </div>
-                        <div id="hijuelas-list-${key}"></div>
-                    </div>
-                `;
-
-                container.appendChild(lineCard);
-
-                // Renderizar Hijuelas dentro de esta Línea
-                const hijuelasListEl = document.getElementById(`hijuelas-list-${key}`);
-                if (hijuelaKeys.length === 0) {
-                    hijuelasListEl.innerHTML = `<div style="font-size:11px; color:#5f6368; font-style:italic; padding:4px;">No hay hijuelas en esta línea.</div>`;
-                } else {
-                    hijuelaKeys.forEach(hKey => {
-                        const h = hijuelasObj[hKey];
-                        const isActive = (activeLineId === key && activeHijuelaId === hKey);
-                        const hItem = document.createElement('div');
-                        hItem.className = `hijuela-item ${isActive ? 'active' : ''}`;
-                        hItem.onclick = (e) => { e.stopPropagation(); selectHijuela(key, hKey); };
-
-                        hItem.innerHTML = `
-                            <div>
-                                <div class="hijuela-name"><strong>${h.codigo || 'H'}</strong>: ${h.nombre}</div>
-                                <div class="hijuela-stats">${(h.puntos || []).length} paradas • ${h.distanciaKm || '0.0'} km</div>
-                            </div>
-                            <div style="display:flex; gap:4px;">
-                                <button class="btn-secondary" style="padding:3px 6px; font-size:10px;" onclick="event.stopPropagation(); startEditingHijuela('${key}', '${hKey}')" title="Modificar trazado">✏️</button>
-                                <button class="btn-danger" style="padding:3px 6px; font-size:10px;" onclick="event.stopPropagation(); deleteHijuela('${key}', '${hKey}')" title="Eliminar hijuela">🗑️</button>
-                            </div>
-                        `;
-                        hijuelasListEl.appendChild(hItem);
-                    });
-                }
-            });
-        }
-
-        function toggleLineAccordion(lineId) {
-            activeLineId = lineId;
-            renderLinesTree();
-        }
-
-        function selectHijuela(lineId, hijuelaId) {
-            activeLineId = lineId;
-            activeHijuelaId = hijuelaId;
-            renderLinesTree();
-            displayHijuelaOnMap(lineId, hijuelaId);
-        }
-
-        // --- RENDERIZADO DEL TRAZADO EN EL MAPA ---
-        function clearMapLayers() {
-            mapMarkers.forEach(m => map.removeLayer(m));
-            mapMarkers = [];
-            if (mapPolyline) { map.removeLayer(mapPolyline); mapPolyline = null; }
-            mapArrows.forEach(a => map.removeLayer(a));
-            mapArrows = [];
-        }
-
-        function displayHijuelaOnMap(lineId, hijuelaId) {
-            clearMapLayers();
-            const line = dbLines[lineId];
-            if (!line || !line.hijuelas || !line.hijuelas[hijuelaId]) return;
-
-            const hijuela = line.hijuelas[hijuelaId];
-            const points = hijuela.puntos || [];
-
-            if (points.length === 0) {
-                document.getElementById('active-summary-box').style.display = 'none';
-                return;
-            }
-
-            // Crear Marcadores
-            const totalPoints = points.length;
-            points.forEach((pt, index) => {
-                let color = '#1a73e8'; // Azul intermedio
-                if (index === 0) color = '#1e8e3e'; // Verde origen
-                else if (index === totalPoints - 1) color = '#d93025'; // Rojo destino
-
-                const markerIcon = L.divIcon({
-                    className: 'custom-stop-badge',
-                    html: `<div style="background-color:${color}; width:24px; height:24px; border-radius:50%; display:flex; align-items:center; justify-content:center; border:2px solid white; box-shadow:0 2px 5px rgba(0,0,0,0.4);">${index + 1}</div>`,
-                    iconSize: [24, 24], iconAnchor: [12, 12]
-                });
-
-                const marker = L.marker([pt.lat, pt.lng], { icon: markerIcon }).addTo(map);
-                marker.bindTooltip(pt.nombre || `Población ${index + 1}`, { permanent: true, direction: 'top', offset: [0, -12], className: 'map-label' }).openTooltip();
-                mapMarkers.push(marker);
-            });
-
-            // Trazar línea de la carretera vía OSRM
-            if (points.length >= 2) {
-                const waypointsStr = points.map(p => `${p.lng},${p.lat}`).join(';');
-                const url = `https://router.project-osrm.org/route/v1/driving/${waypointsStr}?overview=full&geometries=geojson`;
-
-                fetch(url).then(res => res.json()).then(data => {
-                    if (data.routes && data.routes.length > 0) {
-                        const route = data.routes[0];
-                        const coords = route.geometry.coordinates.map(c => [c[1], c[0]]);
-
-                        mapPolyline = L.polyline(coords, { color: '#ff4a4a', weight: 5, opacity: 0.85, lineJoin: 'round' }).addTo(map);
-                        map.fitBounds(mapPolyline.getBounds(), { padding: [50, 50] });
-
-                        // Actualizar Resumen
-                        document.getElementById('summary-stops-count').innerText = points.length;
-                        document.getElementById('summary-km').innerText = (route.distance / 1000).toFixed(1) + " km";
-                        document.getElementById('summary-time').innerText = Math.round(route.duration / 60) + " min";
-                        document.getElementById('active-summary-box').style.display = 'block';
-                    }
-                }).catch(() => {
-                    // Fallback a línea recta si falla OSRM
-                    const coords = points.map(p => [p.lat, p.lng]);
-                    mapPolyline = L.polyline(coords, { color: '#1a73e8', weight: 4, dashArray: '6, 6' }).addTo(map);
-                    map.fitBounds(mapPolyline.getBounds(), { padding: [50, 50] });
-                });
-            } else if (points.length === 1) {
-                map.setView([points[0].lat, points[0].lng], 12);
-            }
-        }
-
-        // --- EDITOR DE HIJUELA ---
-        function startEditingHijuela(lineId, hijuelaId) {
-            activeLineId = lineId;
-            activeHijuelaId = hijuelaId;
-            const line = dbLines[lineId];
-            const hijuela = line.hijuelas[hijuelaId];
-
-            currentEditingStops = [...(hijuela.puntos || [])];
-            document.getElementById('editor-hijuela-title').innerText = `Editando: ${line.codigo} - ${hijuela.nombre}`;
-            document.getElementById('editor-panel').style.display = 'block';
-
-            renderEditorStopsList();
-            drawCurrentEditorRoute();
-        }
-
-        function closeEditor() {
-            document.getElementById('editor-panel').style.display = 'none';
-            if (activeLineId && activeHijuelaId) displayHijuelaOnMap(activeLineId, activeHijuelaId);
-        }
-
-        function renderEditorStopsList() {
-            const listEl = document.getElementById('editor-stops-list');
-            listEl.innerHTML = "";
-
-            currentEditingStops.forEach((st, idx) => {
-                const row = document.createElement('div');
-                row.className = 'stop-point-row';
-                row.innerHTML = `
-                    <div class="stop-number">${idx + 1}</div>
-                    <input type="text" value="${st.nombre}" style="flex-grow:1; padding:4px; font-size:11px;" oninput="currentEditingStops[${idx}].nombre = this.value; drawCurrentEditorRoute();">
-                    <button class="btn-danger" style="padding:2px 5px; font-size:10px;" onclick="removeEditorStop(${idx})">🗑️</button>
-                `;
-                listEl.appendChild(row);
-            });
-        }
-
-        function removeEditorStop(index) {
-            currentEditingStops.splice(index, 1);
-            renderEditorStopsList();
-            drawCurrentEditorRoute();
-        }
-
-        function addPointFromInputs() {
-            const coordsStr = document.getElementById('editor-point-coords').value.trim();
-            const labelStr = document.getElementById('editor-point-label').value.trim() || ("Parada " + (currentEditingStops.length + 1));
-
-            const clean = coordsStr.replace(/,/g, '.');
-            const parts = clean.split(/\s+/);
-            if (parts.length >= 2) {
-                const lat = parseFloat(parts[0]);
-                const lng = parseFloat(parts[1]);
-                if (!isNaN(lat) && !isNaN(lng)) {
-                    currentEditingStops.push({ nombre: labelStr, lat: lat, lng: lng });
-                    document.getElementById('editor-point-coords').value = "";
-                    document.getElementById('editor-point-label').value = "";
-                    renderEditorStopsList();
-                    drawCurrentEditorRoute();
-                    return;
-                }
-            }
-            alert("Por favor introduce coordenadas válidas (Latitud Longitud).");
-        }
-
-        function drawCurrentEditorRoute() {
-            clearMapLayers();
-            if (currentEditingStops.length === 0) return;
-
-            currentEditingStops.forEach((pt, idx) => {
-                const marker = L.marker([pt.lat, pt.lng]).addTo(map);
-                marker.bindTooltip(`${idx + 1}. ${pt.nombre}`, { permanent: true, direction: 'top', className: 'map-label' }).openTooltip();
-                mapMarkers.push(marker);
-            });
-
-            if (currentEditingStops.length >= 2) {
-                const coords = currentEditingStops.map(p => [p.lat, p.lng]);
-                mapPolyline = L.polyline(coords, { color: '#f2994a', weight: 4, dashArray: '5, 5' }).addTo(map);
-                map.fitBounds(mapPolyline.getBounds(), { padding: [40, 40] });
-            } else if (currentEditingStops.length === 1) {
-                map.setView([currentEditingStops[0].lat, currentEditingStops[0].lng], 12);
-            }
-        }
-
-        function saveActiveHijuelaRoute() {
-            if (!activeLineId || !activeHijuelaId) return;
-
-            // Calcular kilómetros finales antes de guardar
-            if (currentEditingStops.length >= 2) {
-                const waypointsStr = currentEditingStops.map(p => `${p.lng},${p.lat}`).join(';');
-                const url = `https://router.project-osrm.org/route/v1/driving/${waypointsStr}?overview=false`;
-
-                fetch(url).then(res => res.json()).then(data => {
-                    let km = "0.0";
-                    let min = 0;
-                    if (data.routes && data.routes.length > 0) {
-                        km = (data.routes[0].distance / 1000).toFixed(1);
-                        min = Math.round(data.routes[0].duration / 60);
-                    }
-                    commitHijuelaSave(km, min);
-                }).catch(() => commitHijuelaSave("0.0", 0));
-            } else {
-                commitHijuelaSave("0.0", 0);
-            }
-        }
-
-        function commitHijuelaSave(km, min) {
-            const ref = db.ref(`${FIREBASE_NODE}/${activeLineId}/hijuelas/${activeHijuelaId}`);
-            ref.update({
-                puntos: currentEditingStops,
-                distanciaKm: km,
-                tiempoMin: min
-            }).then(() => {
-                alert("Trazado de la hijuela guardado correctamente en Firebase.");
-                closeEditor();
-            }).catch(e => alert("Error al guardar en Firebase: " + e.message));
-        }
-
-        // --- BUSCADOR GEOCODER NOMINATIM ---
-        let searchTimeout = null;
-        function buscarLocalidad(query) {
+        // BUSCADOR DE LOCALIDADES (Nominatim OpenStreetMap)
+        let searchTimeout;
+        function buscarLocalidad() {
             clearTimeout(searchTimeout);
-            const resultsContainer = document.getElementById('geocoder-results');
-            if (!query || query.trim().length < 3) { resultsContainer.style.display = 'none'; return; }
-
+            const query = document.getElementById('map-search').value;
+            const suggBox = document.getElementById('search-suggestions');
+            
+            if(query.length < 3) { suggBox.style.display = 'none'; return; }
+            
             searchTimeout = setTimeout(() => {
-                const url = `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(query)}&countrycodes=es&limit=5`;
-                fetch(url).then(res => res.json()).then(data => {
-                    resultsContainer.innerHTML = "";
-                    if (data && data.length > 0) {
-                        resultsContainer.style.display = 'block';
-                        data.forEach(item => {
+                fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(query)}&countrycodes=es&limit=5`)
+                .then(res => res.json())
+                .then(data => {
+                    suggBox.innerHTML = '';
+                    if(data.length > 0) {
+                        suggBox.style.display = 'block';
+                        data.forEach(place => {
                             const div = document.createElement('div');
-                            div.className = 'geocoder-result-item';
-                            div.innerText = item.display_name;
-                            div.onclick = () => selectGeocodedLocation(item.lat, item.lon, item.display_name);
-                            resultsContainer.appendChild(div);
+                            div.className = 'suggestion-item';
+                            const nombreCorto = place.display_name.split(',').slice(0,3).join(',');
+                            div.innerText = nombreCorto;
+                            div.onclick = () => {
+                                map.setView([place.lat, place.lon], 14);
+                                suggBox.style.display = 'none';
+                                document.getElementById('map-search').value = '';
+                                document.getElementById('map-search').placeholder = nombreCorto;
+                            };
+                            suggBox.appendChild(div);
                         });
-                    } else resultsContainer.style.display = 'none';
-                });
-            }, 400);
+                    } else {
+                        suggBox.style.display = 'none';
+                    }
+                }).catch(err => console.error("Error en búsqueda:", err));
+            }, 600);
+        }
+        
+        document.addEventListener('click', function(e) {
+            if(!document.querySelector('.search-container').contains(e.target)) {
+                document.getElementById('search-suggestions').style.display = 'none';
+            }
+        });
+
+        // AUTENTICACIÓN
+        function iniciarSesion() {
+            const e = document.getElementById('login-email').value;
+            const p = document.getElementById('login-password').value;
+            auth.signInWithEmailAndPassword(e, p).catch(err => {
+                document.getElementById('login-error').innerText = "Credenciales incorrectas.";
+                document.getElementById('login-error').style.display = 'block';
+            });
+        }
+        auth.onAuthStateChanged(user => {
+            if (user) { document.getElementById('auth-overlay').style.display = 'none'; escucharBaseDatos(); } 
+            else { document.getElementById('auth-overlay').style.display = 'flex'; }
+        });
+
+        // BASE DE DATOS Y RENDERIZADO UI
+        function escucharBaseDatos() {
+            db.ref(DB_NODE).on('value', snapshot => {
+                datosFirebase = snapshot.val() || {};
+                actualizarDesplegableLineas();
+                
+                if (lineaActivaId && datosFirebase[lineaActivaId]) {
+                    renderizarHijuelas();
+                    if (hijuelasSeleccionadas.size === 1) {
+                        const hKey = Array.from(hijuelasSeleccionadas)[0];
+                        if (datosFirebase[lineaActivaId].hijuelas && datosFirebase[lineaActivaId].hijuelas[hKey]) {
+                            puntosActuales = datosFirebase[lineaActivaId].hijuelas[hKey].puntos || [];
+                            renderizarListaParadas();
+                        }
+                    }
+                    dibujarTrazadoEnMapa();
+                } else {
+                    resetearVista();
+                }
+            });
         }
 
-        function selectGeocodedLocation(lat, lon, displayName) {
-            const shortName = displayName.split(',')[0];
-            document.getElementById('geocoder-results').style.display = 'none';
-            document.getElementById('search-locality').value = shortName;
-
-            currentEditingStops.push({ nombre: shortName, lat: parseFloat(lat), lng: parseFloat(lon) });
-            renderEditorStopsList();
-            drawCurrentEditorRoute();
+        function resetearVista() {
+            lineaActivaId = null; 
+            hijuelasSeleccionadas.clear();
+            puntosActuales = [];
+            document.getElementById('btn-add-hijuela').style.display = 'none';
+            document.getElementById('btn-editar-linea').style.display = 'none';
+            document.getElementById('btn-borrar-linea').style.display = 'none';
+            document.getElementById('editor-panel').style.display = 'none';
+            document.getElementById('hijuelas-container').innerHTML = '<p style="font-size: 13px; color: var(--text-muted); text-align: center; margin-top: 30px; font-style: italic;">Selecciona una línea en el desplegable superior.</p>';
+            limpiarMapa();
         }
 
-        // --- MODALES GESTIÓN DE LÍNEAS E HIJUELAS ---
-        function openLineModal() {
-            document.getElementById('modal-line-id').value = "";
-            document.getElementById('modal-line-code').value = "";
-            document.getElementById('modal-line-name').value = "";
-            document.getElementById('modal-line-company').value = "";
-            document.getElementById('modal-line-notes').value = "";
-            document.getElementById('modal-line-title').innerText = "Nueva Línea Regular";
-            document.getElementById('modal-line').classList.add('active');
+        function actualizarDesplegableLineas() {
+            const select = document.getElementById('select-linea');
+            const valorActual = select.value;
+            select.innerHTML = '<option value="">-- Selecciona una Línea Regular --</option>';
+            
+            Object.keys(datosFirebase).forEach(key => {
+                const linea = datosFirebase[key];
+                const opt = document.createElement('option');
+                opt.value = key;
+                
+                const cod = linea.codigo || 'Sin Código';
+                const den = linea.denominacion || 'Sin Denominación';
+                const emp = linea.empresa || 'Sin Empresa';
+                
+                opt.innerText = `${cod} - ${den} (${emp})`;
+                select.appendChild(opt);
+            });
+            if(valorActual && datosFirebase[valorActual]) select.value = valorActual;
         }
 
-        function openEditLineModal(lineId) {
-            const line = dbLines[lineId];
-            if (!line) return;
-            document.getElementById('modal-line-id').value = lineId;
-            document.getElementById('modal-line-code').value = line.codigo || "";
-            document.getElementById('modal-line-name').value = line.nombre || "";
-            document.getElementById('modal-line-company').value = line.empresa || "";
-            document.getElementById('modal-line-notes').value = line.observaciones || "";
-            document.getElementById('modal-line-title').innerText = "Editar Línea " + (line.codigo || "");
-            document.getElementById('modal-line').classList.add('active');
-        }
+        function onLineaChange() {
+            const select = document.getElementById('select-linea');
+            lineaActivaId = select.value;
+            hijuelasSeleccionadas.clear();
+            puntosActuales = [];
+            limpiarMapa();
+            document.getElementById('editor-panel').style.display = 'none';
 
-        function closeLineModal() { document.getElementById('modal-line').classList.remove('active'); }
-
-        function saveLineFromModal() {
-            const lineId = document.getElementById('modal-line-id').value;
-            const code = document.getElementById('modal-line-code').value.trim().toUpperCase();
-            const name = document.getElementById('modal-line-name').value.trim();
-            const company = document.getElementById('modal-line-company').value.trim();
-            const notes = document.getElementById('modal-line-notes').value.trim();
-
-            if (!code || !name) { alert("Introduce al menos la denominación (código) y el título de la línea."); return; }
-
-            const lineData = { codigo: code, nombre: name, empresa: company, observaciones: notes };
-
-            if (lineId) {
-                db.ref(`${FIREBASE_NODE}/${lineId}`).update(lineData).then(() => closeLineModal());
+            if (lineaActivaId) {
+                document.getElementById('btn-add-hijuela').style.display = 'block';
+                document.getElementById('btn-editar-linea').style.display = 'block';
+                document.getElementById('btn-borrar-linea').style.display = 'block';
+                renderizarHijuelas();
             } else {
-                lineData.fechaCreacion = new Date().toISOString().split('T')[0];
-                db.ref(FIREBASE_NODE).push(lineData).then(() => closeLineModal());
+                resetearVista();
             }
         }
 
-        function openHijuelaModal(lineId) {
-            document.getElementById('modal-hijuela-line-id').value = lineId;
-            document.getElementById('modal-hijuela-code').value = "Hijuela " + (Object.keys(dbLines[lineId].hijuelas || {}).length + 1);
-            document.getElementById('modal-hijuela-name').value = "";
-            document.getElementById('modal-hijuela').classList.add('active');
+        function renderizarHijuelas() {
+            const container = document.getElementById('hijuelas-container');
+            container.innerHTML = '';
+
+            const linea = datosFirebase[lineaActivaId];
+            if (!linea || !linea.hijuelas) {
+                container.innerHTML = '<div style="background: white; border: 1px dashed var(--border-color); padding: 20px; text-align: center; border-radius: 8px; color: var(--text-muted); font-size: 13px;">Esta línea aún no tiene hijuelas registradas.</div>';
+                return;
+            }
+
+            Object.keys(linea.hijuelas).forEach(hKey => {
+                const hijuela = linea.hijuelas[hKey];
+                const paradasCount = (hijuela.puntos || []).length;
+                const km = hijuela.distanciaKm || "0.0";
+                const isSelected = hijuelasSeleccionadas.has(hKey);
+
+                const div = document.createElement('div');
+                div.className = `hijuela-card ${isSelected ? 'active' : ''}`;
+                div.onclick = () => toggleSeleccionHijuela(hKey);
+
+                div.innerHTML = `
+                    <div style="display:flex; justify-content: space-between; align-items: start;">
+                        <div style="flex: 1;">
+                            <div class="hijuela-title">
+                                <span>📌 ${hijuela.nombre}</span>
+                                <span style="font-size: 11px; padding: 2px 6px; border-radius: 4px; background: ${isSelected ? 'var(--primary-color)' : '#e2e8f0'}; color: ${isSelected ? 'white' : 'var(--text-muted)'};">
+                                    ${isSelected ? 'Seleccionada' : 'Oculta'}
+                                </span>
+                            </div>
+                            <div class="hijuela-info">🛑 ${paradasCount} paradas registradas &nbsp;|&nbsp; 🛣️ ${km} km trazados</div>
+                        </div>
+                        <button class="btn-danger" style="padding: 5px 8px; font-size: 11px; margin-left: 8px;" onclick="borrarHijuela(event, '${hKey}')" title="Borrar Hijuela">🗑️</button>
+                    </div>
+                `;
+                container.appendChild(div);
+            });
         }
 
-        function closeHijuelaModal() { document.getElementById('modal-hijuela').classList.remove('active'); }
+        function toggleSeleccionHijuela(hKey) {
+            if (hijuelasSeleccionadas.has(hKey)) {
+                hijuelasSeleccionadas.delete(hKey);
+            } else {
+                hijuelasSeleccionadas.add(hKey);
+            }
+            
+            renderizarHijuelas();
+            dibujarTrazadoEnMapa();
 
-        function saveHijuelaFromModal() {
-            const lineId = document.getElementById('modal-hijuela-line-id').value;
-            const code = document.getElementById('modal-hijuela-code').value.trim();
-            const name = document.getElementById('modal-hijuela-name').value.trim();
+            const editorPanel = document.getElementById('editor-panel');
+            if (hijuelasSeleccionadas.size === 1) {
+                const singleKey = Array.from(hijuelasSeleccionadas)[0];
+                const hijuela = datosFirebase[lineaActivaId].hijuelas[singleKey];
+                puntosActuales = [...(hijuela.puntos || [])];
+                editorPanel.style.display = 'block';
+                renderizarListaParadas();
+            } else {
+                puntosActuales = [];
+                editorPanel.style.display = 'none';
+            }
+        }
 
-            if (!name) { alert("Introduce la denominación de la hijuela."); return; }
+        // MAPA Y EVENTOS DE CREACIÓN DE PUNTOS
+        map.on('click', function(e) {
+            if (hijuelasSeleccionadas.size !== 1) return; 
+            
+            const defaultName = "Parada " + (puntosActuales.length + 1);
+            const popupContent = `
+                <div style="padding: 8px; width: 200px;">
+                    <div style="font-size:13px; font-weight:bold; margin-bottom:8px; color:var(--primary-dark);">Añadir Nueva Parada</div>
+                    <input type="text" id="popup-stop-name" value="${defaultName}" style="width:100%; padding:8px; border:1px solid #cbd5e1; border-radius:4px; box-sizing:border-box; margin-bottom:10px; font-size:13px;">
+                    <button class="btn-primary" style="width:100%; padding:8px; font-size:12px;" onclick="confirmarPuntoMapa(${e.latlng.lat}, ${e.latlng.lng})">Confirmar Parada</button>
+                </div>
+            `;
+            L.popup().setLatLng(e.latlng).setContent(popupContent).openOn(map);
+            setTimeout(() => { const input = document.getElementById('popup-stop-name'); if(input) { input.focus(); input.select(); } }, 100);
+        });
 
-            const newHijuelaRef = db.ref(`${FIREBASE_NODE}/${lineId}/hijuelas`).push();
-            newHijuelaRef.set({ codigo: code, nombre: name, puntos: [], distanciaKm: "0.0", tiempoMin: 0 })
-                .then(() => {
-                    closeHijuelaModal();
-                    startEditingHijuela(lineId, newHijuelaRef.key);
+        function confirmarPuntoMapa(lat, lng) {
+            const name = document.getElementById('popup-stop-name').value || "Parada";
+            map.closePopup();
+            puntosActuales.push({ nombre: name, lat: lat, lng: lng });
+            renderizarListaParadas();
+            dibujarTrazadoEnMapa();
+        }
+
+        function renderizarListaParadas() {
+            const list = document.getElementById('stops-list');
+            list.innerHTML = '';
+            if(puntosActuales.length === 0) {
+                list.innerHTML = '<div style="padding:15px; font-size:12px; color:var(--text-muted); text-align:center;">No hay paradas. Haz clic en el mapa para añadir la primera.</div>';
+                return;
+            }
+            puntosActuales.forEach((pt, i) => {
+                const item = document.createElement('div');
+                item.className = 'stop-item';
+                item.innerHTML = `
+                    <div style="display:flex; align-items:center; flex:1; gap: 8px;">
+                        <span class="number">${i + 1}</span> 
+                        <input type="text" class="stop-name-input" value="${pt.nombre}" oninput="actualizarNombreParadaLocal(${i}, this.value)" title="Haz clic para editar la etiqueta">
+                    </div>
+                    <button class="btn-danger" style="padding:4px 8px; font-size:10px;" onclick="borrarParada(${i})" title="Eliminar Parada">X</button>
+                `;
+                list.appendChild(item);
+            });
+        }
+
+        function actualizarNombreParadaLocal(index, nuevoNombre) {
+            if (puntosActuales[index]) {
+                puntosActuales[index].nombre = nuevoNombre;
+                // Actualizar tooltips en tiempo real sin perder foco ni redibujar todo el mapa de golpe
+                if (mapMarkers[index]) {
+                    const hKey = Array.from(hijuelasSeleccionadas)[0];
+                    const hijuela = datosFirebase[lineaActivaId].hijuelas[hKey];
+                    mapMarkers[index].setTooltipContent(`${hijuela ? hijuela.nombre : ''}: ${nuevoNombre}`);
+                }
+            }
+        }
+
+        function borrarParada(index) {
+            puntosActuales.splice(index, 1);
+            renderizarListaParadas();
+            dibujarTrazadoEnMapa();
+        }
+
+        function limpiarMapa() {
+            mapMarkers.forEach(m => map.removeLayer(m)); 
+            mapMarkers = [];
+            mapPolylines.forEach(p => map.removeLayer(p)); 
+            mapPolylines = [];
+            document.getElementById('km-text').innerText = "0.0 km";
+            ultimaDistanciaKm = "0.0";
+        }
+
+        function dibujarTrazadoEnMapa() {
+            limpiarMapa();
+            if (hijuelasSeleccionadas.size === 0) return;
+
+            const coloresPaleta = ['#3b82f6', '#10b981', '#f59e0b', '#8b5cf6', '#f43f5e', '#06b6d4', '#6366f1', '#ec4899'];
+            let colorIndex = 0;
+            let allBounds = [];
+
+            hijuelasSeleccionadas.forEach(hKey => {
+                const hijuela = datosFirebase[lineaActivaId].hijuelas[hKey];
+                if (!hijuela || !hijuela.puntos || hijuela.puntos.length === 0) return;
+
+                const puntos = (hijuelasSeleccionadas.size === 1 && hKey === Array.from(hijuelasSeleccionadas)[0] && puntosActuales.length > 0) ? puntosActuales : hijuela.puntos;
+                const colorLinea = coloresPaleta[colorIndex % coloresPaleta.length];
+                colorIndex++;
+
+                puntos.forEach((pt, idx) => {
+                    let colorMarker = colorLinea;
+                    if (idx === 0) colorMarker = 'var(--accent-color)'; 
+                    if (idx === puntos.length - 1 && puntos.length > 1) colorMarker = 'var(--danger-color)'; 
+
+                    const icon = L.divIcon({
+                        className: 'custom-stop',
+                        html: `<div style="background:${colorMarker}; width:22px; height:22px; border-radius:50%; color:white; display:flex; align-items:center; justify-content:center; font-size:11px; font-weight:bold; border:2px solid white; box-shadow:0 3px 6px rgba(0,0,0,0.2);">${idx + 1}</div>`,
+                        iconSize: [22, 22], iconAnchor: [11, 11]
+                    });
+
+                    const marker = L.marker([pt.lat, pt.lng], { icon }).addTo(map);
+                    marker.bindTooltip(`${hijuela.nombre}: ${pt.nombre}`, { permanent: false, direction: 'top', offset: [0, -10], className: 'map-label' });
+                    mapMarkers.push(marker);
+                    allBounds.push([pt.lat, pt.lng]);
                 });
-        }
 
-        function deleteHijuela(lineId, hijuelaId) {
-            if (confirm("¿Seguro que deseas eliminar esta hijuela de la línea?")) {
-                db.ref(`${FIREBASE_NODE}/${lineId}/hijuelas/${hijuelaId}`).remove();
+                if (puntos.length >= 2) {
+                    const waypoints = puntos.map(p => `${p.lng},${p.lat}`).join(';');
+                    const url = `https://router.project-osrm.org/route/v1/driving/${waypoints}?overview=full&geometries=geojson`;
+                    fetch(url).then(res => res.json()).then(data => {
+                        if (data.routes && data.routes.length > 0) {
+                            const coords = data.routes[0].geometry.coordinates.map(c => [c[1], c[0]]);
+                            const polyline = L.polyline(coords, { color: colorLinea, weight: 5, opacity: 0.85, lineJoin: 'round' }).addTo(map);
+                            mapPolylines.push(polyline);
+                            if (hijuelasSeleccionadas.size === 1) {
+                                ultimaDistanciaKm = (data.routes[0].distance / 1000).toFixed(1);
+                                document.getElementById('km-text').innerText = ultimaDistanciaKm + " km";
+                            }
+                        }
+                    }).catch(() => {
+                        const coords = puntos.map(p => [p.lat, p.lng]);
+                        const polyline = L.polyline(coords, { color: colorLinea, weight: 4, dashArray: '8,8' }).addTo(map);
+                        mapPolylines.push(polyline);
+                    });
+                } else if (puntos.length === 1 && hijuelasSeleccionadas.size === 1) {
+                    map.setView([puntos[0].lat, puntos[0].lng], 13);
+                }
+            });
+
+            if (allBounds.length > 0) {
+                const bounds = L.latLngBounds(allBounds);
+                map.fitBounds(bounds, { padding: [50, 50] });
             }
         }
 
-        // --- EXPORTAR E IMPORTAR COPIAS DE SEGURIDAD ---
-        function exportJSON() {
-            const blob = new Blob([JSON.stringify(dbLines, null, 2)], { type: "application/json" });
-            const url = URL.createObjectURL(blob);
-            const a = document.createElement("a");
-            a.href = url;
-            a.download = `backup_lineas_regulares_leon_${new Date().toISOString().split('T')[0]}.json`;
-            a.click();
-            URL.revokeObjectURL(url);
+        // ACCIONES DE GUARDADO Y EDICIÓN FIREBASE
+        function guardarTrazadoHijuela() {
+            if (!lineaActivaId || hijuelasSeleccionadas.size !== 1) return;
+            const hKey = Array.from(hijuelasSeleccionadas)[0];
+            db.ref(`${DB_NODE}/${lineaActivaId}/hijuelas/${hKey}`).update({
+                puntos: puntosActuales, distanciaKm: ultimaDistanciaKm
+            }).then(() => alert("Ruta y etiquetas de paradas guardadas correctamente en el sistema."));
         }
 
-        function triggerImport() { document.getElementById('import-file-input').click(); }
+        function limpiarTrazadoCompleto() {
+            if (hijuelasSeleccionadas.size !== 1) return;
+            if(confirm("¿Borrar toda la ruta de esta hijuela de forma permanente?")) {
+                puntosActuales = [];
+                ultimaDistanciaKm = "0.0";
+                const hKey = Array.from(hijuelasSeleccionadas)[0];
+                db.ref(`${DB_NODE}/${lineaActivaId}/hijuelas/${hKey}`).update({
+                    puntos: [], distanciaKm: "0.0"
+                });
+                renderizarListaParadas();
+                dibujarTrazadoEnMapa();
+            }
+        }
 
-        function importJSON(event) {
+        function guardarNuevaLinea() {
+            const codigo = document.getElementById('input-linea-codigo').value.trim();
+            const denominacion = document.getElementById('input-linea-denominacion').value.trim();
+            const empresa = document.getElementById('input-linea-empresa').value.trim();
+            
+            if(!codigo) { alert("El código de la línea es obligatorio."); return; }
+            if(!denominacion) { alert("La denominación de la línea es obligatoria."); return; }
+
+            db.ref(DB_NODE).push({ 
+                codigo: codigo, 
+                denominacion: denominacion, 
+                empresa: empresa 
+            }).then(snap => {
+                cerrarModal('modal-linea');
+                document.getElementById('input-linea-codigo').value = '';
+                document.getElementById('input-linea-denominacion').value = '';
+                document.getElementById('input-linea-empresa').value = '';
+                setTimeout(() => { document.getElementById('select-linea').value = snap.key; onLineaChange(); }, 500);
+            });
+        }
+
+        function abrirModalEditarLinea() {
+            if (!lineaActivaId || !datosFirebase[lineaActivaId]) return;
+            const linea = datosFirebase[lineaActivaId];
+            document.getElementById('edit-linea-codigo').value = linea.codigo || '';
+            document.getElementById('edit-linea-denominacion').value = linea.denominacion || '';
+            document.getElementById('edit-linea-empresa').value = linea.empresa || '';
+            document.getElementById('modal-editar-linea').classList.add('open');
+        }
+
+        function actualizarLineaActual() {
+            if (!lineaActivaId) return;
+            const codigo = document.getElementById('edit-linea-codigo').value.trim();
+            const denominacion = document.getElementById('edit-linea-denominacion').value.trim();
+            const empresa = document.getElementById('edit-linea-empresa').value.trim();
+
+            if(!codigo) { alert("El código de la línea es obligatorio."); return; }
+            if(!denominacion) { alert("La denominación de la línea es obligatoria."); return; }
+
+            db.ref(`${DB_NODE}/${lineaActivaId}`).update({
+                codigo: codigo,
+                denominacion: denominacion,
+                empresa: empresa
+            }).then(() => {
+                cerrarModal('modal-editar-linea');
+                alert("Datos de la línea actualizados correctamente.");
+            });
+        }
+
+        function borrarLinea() {
+            if(!lineaActivaId) return;
+            if(confirm("¿Eliminar completamente esta línea y TODAS sus hijuelas?\n\nEsta acción es irreversible y afectará a la base de datos central.")) {
+                db.ref(`${DB_NODE}/${lineaActivaId}`).remove().then(() => {
+                    document.getElementById('select-linea').value = "";
+                    onLineaChange();
+                });
+            }
+        }
+
+        function guardarNuevaHijuela() {
+            if(!lineaActivaId) return;
+            const nombre = document.getElementById('input-hijuela-nombre').value.trim();
+            if(!nombre) { alert("El nombre de la hijuela es obligatorio."); return; }
+            db.ref(`${DB_NODE}/${lineaActivaId}/hijuelas`).push({ nombre: nombre, puntos: [], distanciaKm: "0.0" }).then(snap => {
+                cerrarModal('modal-hijuela');
+                document.getElementById('input-hijuela-nombre').value = '';
+                
+                hijuelasSeleccionadas.clear();
+                hijuelasSeleccionadas.add(snap.key);
+                renderizarHijuelas();
+                const hijuela = datosFirebase[lineaActivaId].hijuelas[snap.key];
+                puntosActuales = [...(hijuela.puntos || [])];
+                document.getElementById('editor-panel').style.display = 'block';
+                renderizarListaParadas();
+                dibujarTrazadoEnMapa();
+            });
+        }
+
+        function borrarHijuela(event, hKey) {
+            event.stopPropagation();
+            if(confirm("¿Eliminar esta hijuela y su trazado de forma permanente?")) {
+                db.ref(`${DB_NODE}/${lineaActivaId}/hijuelas/${hKey}`).remove().then(() => {
+                    hijuelasSeleccionadas.delete(hKey);
+                    if (hijuelasSeleccionadas.size !== 1) {
+                        document.getElementById('editor-panel').style.display = 'none';
+                        puntosActuales = [];
+                    }
+                    dibujarTrazadoEnMapa();
+                });
+            }
+        }
+
+        // GESTIÓN JSON
+        function exportarJSON() {
+            if(Object.keys(datosFirebase).length === 0) { alert("No hay datos para exportar."); return; }
+            const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(datosFirebase, null, 2));
+            const downloadAnchorNode = document.createElement('a');
+            downloadAnchorNode.setAttribute("href", dataStr);
+            downloadAnchorNode.setAttribute("download", `Copia_LineasRegulares_${new Date().toISOString().split('T')[0]}.json`);
+            document.body.appendChild(downloadAnchorNode);
+            downloadAnchorNode.click();
+            downloadAnchorNode.remove();
+        }
+
+        function importarJSON(event) {
             const file = event.target.files[0];
             if (!file) return;
+            
             const reader = new FileReader();
             reader.onload = function(e) {
                 try {
-                    const data = JSON.parse(e.target.result);
-                    if (data && typeof data === 'object') {
-                        if (confirm("¿Reemplazar la base de datos completa de líneas regulares en Firebase con este archivo?")) {
-                            db.ref(FIREBASE_NODE).set(data).then(() => alert("Líneas importadas correctamente."));
-                        }
+                    const jsonObj = JSON.parse(e.target.result);
+                    if(confirm("⚠ ATENCIÓN: Esta acción SOBRESCRIBIRÁ toda la base de datos actual en la nube.\n¿Estás seguro de que quieres importar este archivo?")) {
+                        db.ref(DB_NODE).set(jsonObj).then(() => {
+                            alert("Datos importados y sincronizados con éxito.");
+                            event.target.value = ''; 
+                        });
+                    } else {
+                        event.target.value = '';
                     }
-                } catch(err) { alert("Error al leer el archivo JSON: " + err.message); }
+                } catch (error) {
+                    alert("Error crítico al leer el archivo JSON: " + error.message);
+                    event.target.value = '';
+                }
             };
             reader.readAsText(file);
         }
 
-        // --- IMPRESIÓN ---
-        function printHijuelaReport() {
-            if (!activeLineId || !activeHijuelaId) { alert("Selecciona primero una hijuela para imprimir."); return; }
-            const line = dbLines[activeLineId];
-            const hijuela = line.hijuelas[activeHijuelaId];
-            const points = hijuela.puntos || [];
+        // CONTROL DE MODALES
+        function abrirModalLinea() { document.getElementById('modal-linea').classList.add('open'); }
+        function abrirModalHijuela() { document.getElementById('modal-hijuela').classList.add('open'); }
+        function cerrarModal(id) { document.getElementById(id).classList.remove('open'); }
 
-            if (points.length === 0) { alert("La hijuela seleccionada no tiene paradas registradas."); return; }
-
-            const snapshotContainer = document.getElementById('snapshot-container');
-            snapshotContainer.innerHTML = '';
-
-            html2canvas(document.getElementById('map'), { useCORS: true }).then(canvas => {
-                const img = document.createElement('img');
-                img.src = canvas.toDataURL('image/png');
-                img.className = 'print-map-snapshot';
-                snapshotContainer.appendChild(img);
-
-                document.getElementById('print-hijuela-title').innerText = `${line.codigo || ''} - ${line.nombre} | ${hijuela.nombre}`;
-
-                const tableBody = document.getElementById('print-table-body');
-                tableBody.innerHTML = '';
-                points.forEach((pt, idx) => {
-                    const tr = document.createElement('tr');
-                    tr.innerHTML = `
-                        <td style="text-align:center;"><strong>${idx + 1}</strong></td>
-                        <td><strong>${pt.nombre}</strong></td>
-                        <td>${pt.lat.toFixed(6)}, ${pt.lng.toFixed(6)}</td>
-                        <td>${idx === 0 ? '--- (Origen)' : 'Tramo intermedio'}</td>
-                    `;
-                    tableBody.appendChild(tr);
-                });
-
-                window.print();
-            });
-        }
     </script>
 </body>
 </html>
