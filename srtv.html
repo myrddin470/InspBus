@@ -13,16 +13,15 @@
 
     <style>
         :root {
-            /* Paleta Pastel Profesional y Atractiva */
-            --primary-dark: #334155;    /* Gris Pizarra Oscuro */
-            --primary-color: #3b82f6;   /* Azul Suave Profesional */
-            --primary-light: #f1f5f9;   /* Fondo Neutro Muy Suave */
-            --accent-color: #10b981;    /* Verde Menta Suave */
-            --danger-color: #f43f5e;    /* Coral / Rojo Suave */
-            --bg-light: #f8fafc;        /* Fondo General Gris Cálido */
-            --border-color: #cbd5e1;    /* Borde Discreto */
-            --text-main: #1e293b;       /* Texto Principal Nítido */
-            --text-muted: #64748b;      /* Texto Secundario Apagado */
+            --primary-dark: #334155;    
+            --primary-color: #3b82f6;   
+            --primary-light: #f1f5f9;   
+            --accent-color: #10b981;    
+            --danger-color: #f43f5e;    
+            --bg-light: #f8fafc;        
+            --border-color: #cbd5e1;    
+            --text-main: #1e293b;       
+            --text-muted: #64748b;      
         }
 
         body, html { margin: 0; padding: 0; height: 100%; font-family: 'Segoe UI', system-ui, -apple-system, sans-serif; overflow: hidden; background-color: var(--bg-light); }
@@ -37,7 +36,7 @@
         .auth-card button { width: 100%; padding: 12px; background: var(--primary-color); color: white; border: none; border-radius: 6px; font-weight: 600; font-size: 15px; cursor: pointer; transition: 0.2s; }
         .auth-card button:hover { background: #2563eb; }
 
-        /* Panel Lateral (Ampliado y Estilizado) */
+        /* Panel Lateral */
         .sidebar {
             position: absolute; top: 15px; left: 15px; width: 420px; max-height: 94vh;
             background: white; z-index: 1000; border-radius: 12px; box-shadow: 0 10px 30px rgba(0,0,0,0.1);
@@ -149,19 +148,23 @@
 
         <!-- Cabecera Visual -->
         <div class="app-header">
-            <h2>🚌 Inspección de Transportes - León</h2>
+            <h2>🚌 Inspección de Transportes</h2>
             <p>Gestor de Rutas y Líneas Regulares</p>
         </div>
 
         <div class="panel-header">
             <label>SELECCIONAR LÍNEA REGULAR (VACL / AECL)</label>
-            <div style="display: flex; gap: 8px;">
-                <select id="select-linea" onchange="onLineaChange()" style="flex:1; margin-bottom: 0;">
-                    <option value="">-- Elige una línea --</option>
-                </select>
-                <button class="btn-primary" onclick="abrirModalLinea()" title="Crear Nueva Línea" style="padding: 10px;">➕</button>
-                <button class="btn-outline" id="btn-editar-linea" onclick="abrirModalEditarLinea()" title="Modificar Datos de la Línea" style="display:none; padding: 10px; background: white;">✏️</button>
-                <button class="btn-danger" id="btn-borrar-linea" onclick="borrarLinea()" title="Borrar Línea" style="display:none; padding: 10px;">🗑️</button>
+            
+            <!-- Selector de líneas ocupando todo el ancho -->
+            <select id="select-linea" onchange="onLineaChange()" style="width: 100%; margin-bottom: 10px;">
+                <option value="">-- Elige una línea --</option>
+            </select>
+
+            <!-- Botones de acción debajo del selector en otra línea -->
+            <div class="btn-row" style="margin-bottom: 0;">
+                <button class="btn-primary" onclick="abrirModalLinea()" style="flex: 1;" title="Crear Nueva Línea">➕ Nueva Línea</button>
+                <button class="btn-outline" id="btn-editar-linea" onclick="abrirModalEditarLinea()" style="display:none; flex: 1; background: white;" title="Modificar Datos">✏️ Editar</button>
+                <button class="btn-danger" id="btn-borrar-linea" onclick="borrarLinea()" style="display:none; flex: 1;" title="Borrar Línea">🗑️ Borrar</button>
             </div>
             
             <button id="btn-add-hijuela" class="btn-outline" style="width: 100%; display: none; margin-top: 15px;" onclick="abrirModalHijuela()">
@@ -371,7 +374,6 @@
 
         function cerrarSesion() {
             auth.signOut().then(() => {
-                // El observador onAuthStateChanged restablece y muestra el overlay de inicio de sesión automáticamente
             }).catch(err => {
                 console.error("Error al cerrar sesión:", err);
             });
@@ -454,8 +456,8 @@
 
             if (lineaActivaId) {
                 document.getElementById('btn-add-hijuela').style.display = 'block';
-                document.getElementById('btn-editar-linea').style.display = 'block';
-                document.getElementById('btn-borrar-linea').style.display = 'block';
+                document.getElementById('btn-editar-linea').style.display = 'flex';
+                document.getElementById('btn-borrar-linea').style.display = 'flex';
                 renderizarHijuelas();
             } else {
                 resetearVista();
@@ -483,12 +485,9 @@
                 div.onclick = () => toggleSeleccionHijuela(hKey);
 
                 div.innerHTML = `
-                    <!-- Nombre de la hijuela ocupando todo el ancho -->
                     <div class="w-full mb-2">
                         <h3 class="text-sm font-bold text-slate-800 leading-tight">📌 ${hijuela.nombre}</h3>
                     </div>
-
-                    <!-- Línea inferior con paradas, km trazados y botones a la derecha -->
                     <div class="flex items-center justify-between pt-2 border-t border-gray-100 text-xs text-slate-500 mt-auto">
                         <div class="flex items-center space-x-3">
                             <span class="flex items-center gap-1">
@@ -498,8 +497,6 @@
                                 🛣️ <span>${km} km</span>
                             </span>
                         </div>
-
-                        <!-- Botones de editar y borrar alineados a la derecha -->
                         <div class="flex items-center space-x-1" onclick="event.stopPropagation()">
                             <button onclick="abrirModalEditarHijuela(event, '${hKey}')" class="p-1.5 text-slate-500 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors" title="Modificar Nombre de la Hijuela">
                                 ✏️
