@@ -257,6 +257,9 @@
             <label>Nombre de la Hijuela</label>
             <input type="text" id="input-hijuela-nombre" placeholder="Ej: Hijuela por Hospital de Órbigo">
             
+            <label>Tipo de Hijuela</label>
+            <input type="text" id="input-hijuela-tipo" placeholder="Ej: Principal, Variante, Secundaria...">
+            
             <div class="btn-row" style="margin-top: 20px; margin-bottom: 0;">
                 <button class="btn-outline" style="flex: 1;" onclick="cerrarModal('modal-hijuela')">Cancelar</button>
                 <button class="btn-primary" style="flex: 1;" onclick="guardarNuevaHijuela()">Guardar Hijuela</button>
@@ -267,9 +270,12 @@
     <!-- MODAL EDITAR HIJUELA -->
     <div id="modal-editar-hijuela" class="modal">
         <div class="modal-content">
-            <h3>Modificar Nombre de la Hijuela</h3>
+            <h3>Modificar Datos de la Hijuela</h3>
             <label>Nombre de la Hijuela</label>
             <input type="text" id="edit-hijuela-nombre" placeholder="Nombre de la hijuela">
+            
+            <label>Tipo de Hijuela</label>
+            <input type="text" id="edit-hijuela-tipo" placeholder="Tipo de la hijuela">
             
             <div class="btn-row" style="margin-top: 20px; margin-bottom: 0;">
                 <button class="btn-outline" style="flex: 1;" onclick="cerrarModal('modal-editar-hijuela')">Cancelar</button>
@@ -443,7 +449,6 @@
                 opt.dataset.shortText = `${cod} - ${den}`;
                 opt.dataset.longText = `${cod} - ${den} (${emp})`;
                 
-                // Por defecto siempre se muestra solo código y denominación
                 opt.innerText = opt.dataset.shortText;
                 select.appendChild(opt);
             });
@@ -505,8 +510,9 @@
                 div.onclick = () => toggleSeleccionHijuela(hKey);
 
                 div.innerHTML = `
-                    <div class="w-full mb-2">
+                    <div class="flex items-center justify-between w-full mb-2">
                         <h3 class="text-sm font-bold text-slate-800 leading-tight">📌 ${hijuela.nombre}</h3>
+                        <span class="text-xs font-semibold uppercase tracking-wider bg-blue-100 text-blue-700 px-2.5 py-0.5 rounded-full">${hijuela.tipo || 'General'}</span>
                     </div>
                     <div class="flex items-center justify-between pt-2 border-t border-gray-100 text-xs text-slate-500 mt-auto">
                         <div class="flex items-center space-x-3">
@@ -518,7 +524,7 @@
                             </span>
                         </div>
                         <div class="flex items-center space-x-1" onclick="event.stopPropagation()">
-                            <button onclick="abrirModalEditarHijuela(event, '${hKey}')" class="p-1.5 text-slate-500 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors" title="Modificar Nombre de la Hijuela">
+                            <button onclick="abrirModalEditarHijuela(event, '${hKey}')" class="p-1.5 text-slate-500 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors" title="Modificar Datos de la Hijuela">
                                 ✏️
                             </button>
                             <button onclick="borrarHijuela(event, '${hKey}')" class="p-1.5 text-slate-500 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors" title="Borrar Hijuela">
@@ -829,10 +835,12 @@
         function guardarNuevaHijuela() {
             if(!lineaActivaId) return;
             const nombre = document.getElementById('input-hijuela-nombre').value.trim();
+            const tipo = document.getElementById('input-hijuela-tipo').value.trim();
             if(!nombre) { alert("El nombre de la hijuela es obligatorio."); return; }
-            db.ref(`${DB_NODE}/${lineaActivaId}/hijuelas`).push({ nombre: nombre, puntos: [], distanciaKm: "0.0" }).then(snap => {
+            db.ref(`${DB_NODE}/${lineaActivaId}/hijuelas`).push({ nombre: nombre, tipo: tipo, puntos: [], distanciaKm: "0.0" }).then(snap => {
                 cerrarModal('modal-hijuela');
                 document.getElementById('input-hijuela-nombre').value = '';
+                document.getElementById('input-hijuela-tipo').value = '';
                 
                 hijuelasSeleccionadas.clear();
                 hijuelasSeleccionadas.add(snap.key);
@@ -851,16 +859,19 @@
             hijuelaActivaId = hKey;
             const hijuela = datosFirebase[lineaActivaId].hijuelas[hKey];
             document.getElementById('edit-hijuela-nombre').value = hijuela.nombre || '';
+            document.getElementById('edit-hijuela-tipo').value = hijuela.tipo || '';
             document.getElementById('modal-editar-hijuela').classList.add('open');
         }
 
         function actualizarHijuelaActual() {
             if (!lineaActivaId || !hijuelaActivaId) return;
             const nombre = document.getElementById('edit-hijuela-nombre').value.trim();
+            const tipo = document.getElementById('edit-hijuela-tipo').value.trim();
             if (!nombre) { alert("El nombre de la hijuela es obligatorio."); return; }
 
             db.ref(`${DB_NODE}/${lineaActivaId}/hijuelas/${hijuelaActivaId}`).update({
-                nombre: nombre
+                nombre: nombre,
+                tipo: tipo
             }).then(() => {
                 cerrarModal('modal-editar-hijuela');
                 hijuelaActivaId = null;
