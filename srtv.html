@@ -60,7 +60,7 @@
         .panel-body { padding: 15px; overflow-y: auto; flex-grow: 1; background: white; }
 
         label { display: block; font-size: 11px; font-weight: 700; color: var(--text-muted); text-transform: uppercase; margin-bottom: 6px; letter-spacing: 0.5px; }
-        select, input[type="text"] { width: 100%; padding: 10px; border: 1px solid var(--border-color); border-radius: 6px; font-size: 14px; margin-bottom: 15px; box-sizing: border-box; background: white; transition: border 0.2s; color: var(--text-main); }
+        select, input[type="text"] { width: 100%; padding: 10px; padding-right: 38px; border: 1px solid var(--border-color); border-radius: 6px; font-size: 14px; margin-bottom: 15px; box-sizing: border-box; background: white; transition: border 0.2s; color: var(--text-main); text-overflow: ellipsis; white-space: nowrap; overflow: hidden; }
         select:focus, input[type="text"]:focus { outline: none; border-color: var(--primary-color); }
         
         .btn-row { display: flex; gap: 10px; margin-bottom: 15px; }
@@ -155,8 +155,8 @@
         <div class="panel-header">
             <label>SELECCIONAR LÍNEA REGULAR (VACL / AECL)</label>
             
-            <!-- Selector de líneas ocupando todo el ancho -->
-            <select id="select-linea" onchange="onLineaChange()" style="width: 100%; margin-bottom: 10px;">
+            <!-- Selector de líneas ocupando todo el ancho y con espacio reservado para la flecha de despliegue -->
+            <select id="select-linea" onmousedown="abrirSelect(this)" onchange="onLineaChange()" onblur="cerrarSelect(this)" style="width: 100%; margin-bottom: 10px; padding-right: 38px;">
                 <option value="">-- Elige una línea --</option>
             </select>
 
@@ -202,7 +202,7 @@
 
     <!-- CONTROL DE CAPAS -->
     <div class="map-layer-control">
-        <select id="layer-select" onchange="cambiarCapaMapa()" style="margin: 0; border: none; font-size: 13px; font-weight: 600; outline: none; padding: 2px; color: var(--text-main); background: transparent;">
+        <select id="layer-select" onchange="cambiarCapaMapa()" style="margin: 0; border: none; font-size: 13px; font-weight: 600; outline: none; padding: 2px 24px 2px 2px; color: var(--text-main); background: transparent;">
             <option value="mapa">Vista Mapa / Callejero</option>
             <option value="satelite">Vista Satélite / Híbrido</option>
         </select>
@@ -440,15 +440,35 @@
                 const den = linea.denominacion || 'Sin Denominación';
                 const emp = linea.empresa || 'Sin Empresa';
                 
-                opt.innerText = `${cod} - ${den} (${emp})`;
+                opt.dataset.shortText = `${cod} - ${den}`;
+                opt.dataset.longText = `${cod} - ${den} (${emp})`;
+                
+                // Por defecto siempre se muestra solo código y denominación
+                opt.innerText = opt.dataset.shortText;
                 select.appendChild(opt);
             });
-            if(valorActual && datosFirebase[valorActual]) select.value = valorActual;
+
+            if(valorActual && datosFirebase[valorActual]) {
+                select.value = valorActual;
+            }
+        }
+
+        function abrirSelect(elem) {
+            Array.from(elem.options).forEach(opt => {
+                if(opt.dataset.longText) opt.innerText = opt.dataset.longText;
+            });
+        }
+
+        function cerrarSelect(elem) {
+            Array.from(elem.options).forEach(opt => {
+                if(opt.dataset.shortText) opt.innerText = opt.dataset.shortText;
+            });
         }
 
         function onLineaChange() {
             const select = document.getElementById('select-linea');
             lineaActivaId = select.value;
+            cerrarSelect(select);
             hijuelasSeleccionadas.clear();
             puntosActuales = [];
             limpiarMapa();
