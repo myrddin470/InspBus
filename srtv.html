@@ -63,8 +63,8 @@
         select, input[type="text"] { width: 100%; padding: 10px; padding-right: 38px; border: 1px solid var(--border-color); border-radius: 6px; font-size: 14px; margin-bottom: 15px; box-sizing: border-box; background: white; transition: border 0.2s; color: var(--text-main); text-overflow: ellipsis; white-space: nowrap; overflow: hidden; }
         select:focus, input[type="text"]:focus { outline: none; border-color: var(--primary-color); }
         
-        .btn-row { display: flex; gap: 10px; margin-bottom: 15px; }
-        button { padding: 10px 15px; font-size: 13px; font-weight: 600; border: none; border-radius: 6px; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 6px; transition: 0.2s; }
+        .btn-row { display: flex; gap: 6px; margin-bottom: 15px; }
+        button { padding: 9px 8px; font-size: 12px; font-weight: 600; border: none; border-radius: 6px; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 4px; transition: 0.2s; }
         .btn-primary { background: var(--primary-color); color: white; }
         .btn-primary:hover { background: #2563eb; }
         .btn-success { background: var(--accent-color); color: white; }
@@ -160,10 +160,11 @@
                 <option value="">-- Elige una línea --</option>
             </select>
 
-            <!-- Botones de acción debajo del selector en otra línea -->
+            <!-- Botones de acción debajo del selector en la misma línea -->
             <div class="btn-row" style="margin-bottom: 0;">
-                <button class="btn-primary" onclick="abrirModalLinea()" style="flex: 1;" title="Crear Nueva Línea">➕ Nueva Línea</button>
+                <button class="btn-primary" onclick="abrirModalLinea()" style="flex: 1;" title="Crear Nueva Línea">➕ Nueva</button>
                 <button class="btn-outline" id="btn-editar-linea" onclick="abrirModalEditarLinea()" style="display:none; flex: 1; background: white;" title="Modificar Datos">✏️ Editar</button>
+                <button class="btn-outline" id="btn-imprimir-linea" onclick="imprimirInformeLinea()" style="display:none; flex: 1; background: white;" title="Imprimir Informe Técnico">🖨️ Informe</button>
                 <button class="btn-danger" id="btn-borrar-linea" onclick="borrarLinea()" style="display:none; flex: 1;" title="Borrar Línea">🗑️ Borrar</button>
             </div>
             
@@ -418,6 +419,7 @@
             puntosActuales = [];
             document.getElementById('btn-add-hijuela').style.display = 'none';
             document.getElementById('btn-editar-linea').style.display = 'none';
+            document.getElementById('btn-imprimir-linea').style.display = 'none';
             document.getElementById('btn-borrar-linea').style.display = 'none';
             document.getElementById('editor-panel').style.display = 'none';
             document.getElementById('hijuelas-container').innerHTML = '<p style="font-size: 13px; color: var(--text-muted); text-align: center; margin-top: 30px; font-style: italic;">Selecciona una línea en el desplegable superior.</p>';
@@ -482,6 +484,7 @@
             if (lineaActivaId) {
                 document.getElementById('btn-add-hijuela').style.display = 'block';
                 document.getElementById('btn-editar-linea').style.display = 'flex';
+                document.getElementById('btn-imprimir-linea').style.display = 'flex';
                 document.getElementById('btn-borrar-linea').style.display = 'flex';
                 renderizarHijuelas();
             } else {
@@ -890,6 +893,118 @@
                     dibujarTrazadoEnMapa();
                 });
             }
+        }
+
+        // GENERACIÓN DE INFORME TÉCNICO PROFESIONAL
+        function imprimirInformeLinea() {
+            if (!lineaActivaId || !datosFirebase[lineaActivaId]) return;
+            const linea = datosFirebase[lineaActivaId];
+            
+            let htmlHijuelas = '';
+            if (linea.hijuelas) {
+                Object.keys(linea.hijuelas).forEach((hKey, index) => {
+                    const hijuela = linea.hijuelas[hKey];
+                    let stopsHtml = '';
+                    if (hijuela.puntos && hijuela.puntos.length > 0) {
+                        stopsHtml = `<table style="width: 100%; border-collapse: collapse; margin-top: 10px; font-size: 12px;">
+                            <thead>
+                                <tr style="background: #f1f5f9; border-bottom: 2px solid #cbd5e1;">
+                                    <th style="padding: 8px; text-align: left; width: 45px;">Nº</th>
+                                    <th style="padding: 8px; text-align: left;">Parada / Localidad</th>
+                                    <th style="padding: 8px; text-align: left; width: 140px;">Coordenadas (Lat, Lng)</th>
+                                </tr>
+                            </thead>
+                            <tbody>`;
+                        hijuela.puntos.forEach((p, pIdx) => {
+                            stopsHtml += `<tr style="border-bottom: 1px solid #e2e8f0;">
+                                <td style="padding: 7px; font-weight: bold; color: #334155;">${pIdx + 1}</td>
+                                <td style="padding: 7px; color: #1e293b; font-weight: 500;">${p.nombre}</td>
+                                <td style="padding: 7px; color: #64748b; font-family: monospace; font-size: 11px;">${p.lat.toFixed(5)}, ${p.lng.toFixed(5)}</td>
+                            </tr>`;
+                        });
+                        stopsHtml += `</tbody></table>`;
+                    } else {
+                        stopsHtml = `<p style="font-style: italic; color: #64748b; font-size: 12px; margin-top: 8px;">No hay paradas definidas para esta hijuela.</p>`;
+                    }
+
+                    htmlHijuelas += `
+                        <div style="margin-bottom: 25px; page-break-inside: avoid; border: 1px solid #cbd5e1; border-radius: 8px; padding: 15px; background: #ffffff;">
+                            <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #e2e8f0; padding-bottom: 8px; margin-bottom: 10px;">
+                                <h3 style="margin: 0; font-size: 14px; color: #334155; font-weight: bold;">📌 Hijuela ${index + 1}: ${hijuela.nombre}</h3>
+                                <span style="font-size: 11px; background: #e0f2fe; color: #0369a1; padding: 3px 8px; border-radius: 4px; font-weight: bold;">Tipo: ${hijuela.tipo || 'General'} | 🛣️ ${hijuela.distanciaKm || '0.0'} km</span>
+                            </div>
+                            ${stopsHtml}
+                        </div>
+                    `;
+                });
+            } else {
+                htmlHijuelas = `<p style="font-style: italic; color: #64748b; font-size: 13px;">No existen hijuelas registradas para esta línea regular.</p>`;
+            }
+
+            const ventanaImpresion = window.open('', '_blank');
+            ventanaImpresion.document.write(`
+                <!DOCTYPE html>
+                <html lang="es">
+                <head>
+                    <meta charset="UTF-8">
+                    <title>Informe Técnico - ${linea.codigo || 'Línea'}</title>
+                    <style>
+                        body { font-family: 'Segoe UI', Arial, sans-serif; color: #1e293b; margin: 0; padding: 30px; background: #ffffff; }
+                        .header { border-bottom: 3px solid #3b82f6; padding-bottom: 15px; margin-bottom: 25px; display: flex; justify-content: space-between; align-items: flex-end; }
+                        .header h1 { margin: 0; font-size: 20px; color: #334155; }
+                        .header p { margin: 4px 0 0 0; font-size: 12px; color: #64748b; text-transform: uppercase; font-weight: 700; letter-spacing: 0.5px; }
+                        .meta-box { background: #f8fafc; border: 1px solid #cbd5e1; border-radius: 8px; padding: 15px; margin-bottom: 25px; display: grid; grid-template-columns: repeat(3, 1fr); gap: 15px; }
+                        .meta-item label { display: block; font-size: 10px; font-weight: bold; color: #64748b; text-transform: uppercase; margin-bottom: 4px; }
+                        .meta-item span { font-size: 14px; font-weight: bold; color: #1e293b; }
+                        .footer { margin-top: 40px; border-top: 1px solid #cbd5e1; padding-top: 15px; font-size: 11px; color: #64748b; display: flex; justify-content: space-between; }
+                        @media print {
+                            body { padding: 0; }
+                            .no-print { display: none !important; }
+                        }
+                    </style>
+                </head>
+                <body>
+                    <div class="no-print" style="text-align: right; margin-bottom: 20px;">
+                        <button onclick="window.print()" style="background: #3b82f6; color: white; border: none; padding: 10px 20px; font-size: 14px; font-weight: bold; border-radius: 6px; cursor: pointer; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">🖨️ Imprimir / Guardar en PDF</button>
+                    </div>
+                    
+                    <div class="header">
+                        <div>
+                            <p>Inspección de Transportes - Castilla y León</p>
+                            <h1>Informe Técnico de Línea Regular e Itinerarios</h1>
+                        </div>
+                        <div style="text-align: right; font-size: 12px; color: #64748b;">
+                            Fecha de emisión: ${new Date().toLocaleDateString('es-ES')}
+                        </div>
+                    </div>
+
+                    <div class="meta-box">
+                        <div class="meta-item">
+                            <label>Código Oficial</label>
+                            <span>${linea.codigo || 'N/D'}</span>
+                        </div>
+                        <div class="meta-item">
+                            <label>Denominación Principal</label>
+                            <span>${linea.denominacion || 'N/D'}</span>
+                        </div>
+                        <div class="meta-item">
+                            <label>Empresa Concesionaria</label>
+                            <span>${linea.empresa || 'N/D'}</span>
+                        </div>
+                    </div>
+
+                    <h2 style="font-size: 16px; color: #334155; border-bottom: 2px solid #e2e8f0; padding-bottom: 8px; margin-top: 30px; margin-bottom: 20px;">Desglose Detallado de Hijuelas</h2>
+                    
+                    ${htmlHijuelas}
+
+                    <div class="footer">
+                        <span>Servicio Territorial de Fomento - Sección de Transportes</span>
+                        <span>Sistema de Gestión e Inspección de Transportes</span>
+                    </div>
+                </body>
+                </html>
+            `);
+            ventanaImpresion.document.close();
         }
 
         // GESTIÓN JSON
