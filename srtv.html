@@ -30,11 +30,12 @@
         /* Autenticación */
         #auth-overlay { position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: var(--bg-light); z-index: 9999; display: flex; align-items: center; justify-content: center; }
         .auth-card { background: white; padding: 40px; border-radius: 12px; box-shadow: 0 10px 25px rgba(0,0,0,0.08); width: 340px; text-align: center; border: 1px solid var(--border-color); }
-        .auth-card h3 { color: var(--primary-dark); margin-top: 0; margin-bottom: 20px; font-size: 20px; }
+        .auth-card h3 { color: var(--primary-dark); margin-top: 0; margin-bottom: 20px; font-size: 20px; font-weight: 700; }
         .auth-card input { width: 100%; padding: 12px; margin-bottom: 15px; border: 1px solid var(--border-color); border-radius: 6px; box-sizing: border-box; font-size: 14px; transition: border-color 0.2s; background: #fafafa; }
         .auth-card input:focus { border-color: var(--primary-color); outline: none; background: white; }
         .auth-card button { width: 100%; padding: 12px; background: var(--primary-color); color: white; border: none; border-radius: 6px; font-weight: 600; font-size: 15px; cursor: pointer; transition: 0.2s; }
         .auth-card button:hover { background: #2563eb; }
+        .auth-card button:disabled { background: #93c5fd; cursor: not-allowed; }
 
         /* Panel Lateral */
         .sidebar {
@@ -113,14 +114,16 @@
 </head>
 <body>
 
-    <!-- OVERLAY FIREBASE -->
+    <!-- OVERLAY FIREBASE CON FORMULARIO CAPTURADO -->
     <div id="auth-overlay">
         <div class="auth-card">
             <h3>Seguridad y Acceso</h3>
-            <input type="email" id="login-email" placeholder="Correo electrónico">
-            <input type="password" id="login-password" placeholder="Contraseña">
-            <button onclick="iniciarSesion()">Acceder al Sistema</button>
-            <p id="login-error" style="color:var(--danger-color); font-size:13px; display:none; margin-top:15px; font-weight:500;"></p>
+            <form id="auth-form" onsubmit="iniciarSesion(event)">
+                <input type="email" id="login-email" placeholder="Correo electrónico" required autocomplete="email">
+                <input type="password" id="login-password" placeholder="Contraseña" required autocomplete="current-password">
+                <button type="submit" id="btn-login">Acceder al Sistema</button>
+            </form>
+            <p id="login-error" style="color:var(--danger-color); font-size:13px; display:none; margin-top:15px; font-weight:500; word-break: break-word;"></p>
         </div>
     </div>
 
@@ -155,12 +158,10 @@
         <div class="panel-header">
             <label>SELECCIONAR LÍNEA REGULAR (VACL / AECL)</label>
             
-            <!-- Selector de líneas ocupando todo el ancho y con espacio reservado para la flecha de despliegue -->
             <select id="select-linea" onmousedown="abrirSelect(this)" onchange="onLineaChange()" onblur="cerrarSelect(this)" style="width: 100%; margin-bottom: 10px; padding-right: 38px;">
                 <option value="">-- Elige una línea --</option>
             </select>
 
-            <!-- Botones de acción debajo del selector en la misma línea -->
             <div class="btn-row" style="margin-bottom: 0;">
                 <button class="btn-primary" onclick="abrirModalLinea()" style="flex: 1;" title="Crear Nueva Línea">➕ Nueva</button>
                 <button class="btn-outline" id="btn-editar-linea" onclick="abrirModalEditarLinea()" style="display:none; flex: 1; background: white;" title="Modificar Datos">✏️ Editar</button>
@@ -259,7 +260,12 @@
             <input type="text" id="input-hijuela-nombre" placeholder="Ej: Hijuela por Hospital de Órbigo">
             
             <label>Tipo de Hijuela</label>
-            <input type="text" id="input-hijuela-tipo" placeholder="Ej: Principal, Variante, Secundaria...">
+            <select id="input-hijuela-tipo" style="width:100%; margin-bottom:15px; padding:10px; border:1px solid var(--border-color); border-radius:6px;">
+                <option value="Regular">Regular</option>
+                <option value="Demanda">Demanda</option>
+                <option value="P. Conjunta">P. Conjunta</option>
+                <option value="Otros">Otros</option>
+            </select>
             
             <div class="btn-row" style="margin-top: 20px; margin-bottom: 0;">
                 <button class="btn-outline" style="flex: 1;" onclick="cerrarModal('modal-hijuela')">Cancelar</button>
@@ -276,7 +282,12 @@
             <input type="text" id="edit-hijuela-nombre" placeholder="Nombre de la hijuela">
             
             <label>Tipo de Hijuela</label>
-            <input type="text" id="edit-hijuela-tipo" placeholder="Tipo de la hijuela">
+            <select id="edit-hijuela-tipo" style="width:100%; margin-bottom:15px; padding:10px; border:1px solid var(--border-color); border-radius:6px;">
+                <option value="Regular">Regular</option>
+                <option value="Demanda">Demanda</option>
+                <option value="P. Conjunta">P. Conjunta</option>
+                <option value="Otros">Otros</option>
+            </select>
             
             <div class="btn-row" style="margin-top: 20px; margin-bottom: 0;">
                 <button class="btn-outline" style="flex: 1;" onclick="cerrarModal('modal-editar-hijuela')">Cancelar</button>
@@ -370,25 +381,57 @@
         });
 
         // AUTENTICACIÓN Y SESIÓN
-        function iniciarSesion() {
-            const e = document.getElementById('login-email').value;
+        function iniciarSesion(event) {
+            if (event) event.preventDefault();
+            
+            const e = document.getElementById('login-email').value.trim();
             const p = document.getElementById('login-password').value;
-            auth.signInWithEmailAndPassword(e, p).catch(err => {
-                document.getElementById('login-error').innerText = "Credenciales incorrectas.";
-                document.getElementById('login-error').style.display = 'block';
-            });
+            const errorBox = document.getElementById('login-error');
+            const btn = document.getElementById('btn-login');
+
+            if (!e || !p) {
+                errorBox.innerText = "Por favor, introduce el correo y la contraseña.";
+                errorBox.style.display = 'block';
+                return;
+            }
+
+            errorBox.style.display = 'none';
+            btn.disabled = true;
+            btn.innerText = "Verificando...";
+
+            auth.signInWithEmailAndPassword(e, p)
+                .then(() => {
+                    btn.disabled = false;
+                    btn.innerText = "Acceder al Sistema";
+                })
+                .catch(err => {
+                    btn.disabled = false;
+                    btn.innerText = "Acceder al Sistema";
+                    console.error("Error Auth Firebase:", err);
+                    
+                    let msg = "Error al iniciar sesión.";
+                    if (err.code === 'auth/invalid-email') msg = "El correo electrónico no tiene un formato válido.";
+                    else if (err.code === 'auth/user-not-found' || err.code === 'auth/wrong-password' || err.code === 'auth/invalid-credential') msg = "Usuario o contraseña incorrectos.";
+                    else if (err.code === 'auth/too-many-requests') msg = "Demasiados intentos fallidos. Inténtalo más tarde.";
+                    else if (err.code === 'auth/operation-not-allowed') msg = "El acceso por Email/Contraseña no está activado en la consola Firebase.";
+                    else msg = "Error de autenticación: " + err.message;
+
+                    errorBox.innerText = msg;
+                    errorBox.style.display = 'block';
+                });
         }
 
         function cerrarSesion() {
-            auth.signOut().then(() => {
-            }).catch(err => {
-                console.error("Error al cerrar sesión:", err);
-            });
+            auth.signOut().catch(err => console.error("Error al cerrar sesión:", err));
         }
 
         auth.onAuthStateChanged(user => {
-            if (user) { document.getElementById('auth-overlay').style.display = 'none'; escucharBaseDatos(); } 
-            else { document.getElementById('auth-overlay').style.display = 'flex'; }
+            if (user) { 
+                document.getElementById('auth-overlay').style.display = 'none'; 
+                escucharBaseDatos(); 
+            } else { 
+                document.getElementById('auth-overlay').style.display = 'flex'; 
+            }
         });
 
         // BASE DE DATOS Y RENDERIZADO UI
@@ -492,6 +535,7 @@
             }
         }
 
+        // MOSTRAR TARJETAS DE HIJUELA CON MOSTRADO DE TIPO Y ESTILOS ASOCIADOS
         function renderizarHijuelas() {
             const container = document.getElementById('hijuelas-container');
             container.innerHTML = '';
@@ -508,14 +552,30 @@
                 const km = hijuela.distanciaKm || "0.0";
                 const isSelected = hijuelasSeleccionadas.has(hKey);
 
+                // Obtención y normalización del tipo
+                const tipoTexto = (hijuela.tipo && hijuela.tipo.trim() !== '') ? hijuela.tipo.trim() : 'Sin Tipo';
+                const tipoNorm = tipoTexto.toLowerCase();
+
+                // Estilo del badge según el tipo
+                let badgeStyle = 'background-color: #f3e8ff; color: #7e22ce; border: 1px solid #d8b4fe;'; // Morado por defecto (Otros)
+                if (tipoNorm.includes('regular')) {
+                    badgeStyle = 'background-color: #fee2e2; color: #dc2626; border: 1px solid #fca5a5;'; // Rojo
+                } else if (tipoNorm.includes('demanda')) {
+                    badgeStyle = 'background-color: #dbeafe; color: #2563eb; border: 1px solid #93c5fd;'; // Azul
+                } else if (tipoNorm.includes('conjunta')) {
+                    badgeStyle = 'background-color: #d1fae5; color: #059669; border: 1px solid #6ee7b7;'; // Verde
+                }
+
                 const div = document.createElement('div');
                 div.className = `bg-white rounded-xl shadow-sm p-3 mb-2.5 cursor-pointer transition-all border ${isSelected ? 'border-2 border-blue-500 bg-blue-50/50' : 'border-gray-200 hover:border-blue-400 hover:shadow-md'} flex flex-col justify-between`;
                 div.onclick = () => toggleSeleccionHijuela(hKey);
 
                 div.innerHTML = `
-                    <div class="flex items-center justify-between w-full mb-2">
+                    <div class="flex items-center justify-between w-full mb-2 gap-2">
                         <h3 class="text-sm font-bold text-slate-800 leading-tight">📌 ${hijuela.nombre}</h3>
-                        <span class="text-xs font-semibold uppercase tracking-wider bg-blue-100 text-blue-700 px-2.5 py-0.5 rounded-full">${hijuela.tipo || 'General'}</span>
+                        <span class="text-xs font-semibold uppercase tracking-wider px-2 py-0.5 rounded-full flex-shrink-0" style="${badgeStyle}">
+                            ${tipoTexto}
+                        </span>
                     </div>
                     <div class="flex items-center justify-between pt-2 border-t border-gray-100 text-xs text-slate-500 mt-auto">
                         <div class="flex items-center space-x-3">
@@ -619,7 +679,7 @@
             });
         }
 
-        // FUNCIONES DE ARRASTRE (DRAG & DROP)
+        // ARRASTRE DE PARADAS
         function handleDragStart(e) {
             draggedIndex = parseInt(this.dataset.index);
             this.classList.add('dragging');
@@ -691,12 +751,11 @@
             ultimaDistanciaKm = "0.0";
         }
 
+        // DIBUJO DE RUTAS SEGÚN LÓGICA DE COLORES POR TIPO
         function dibujarTrazadoEnMapa() {
             limpiarMapa();
             if (hijuelasSeleccionadas.size === 0) return;
 
-            const coloresPaleta = ['#3b82f6', '#10b981', '#f59e0b', '#8b5cf6', '#f43f5e', '#06b6d4', '#6366f1', '#ec4899'];
-            let colorIndex = 0;
             let allBounds = [];
 
             hijuelasSeleccionadas.forEach(hKey => {
@@ -704,13 +763,23 @@
                 if (!hijuela || !hijuela.puntos || hijuela.puntos.length === 0) return;
 
                 const puntos = (hijuelasSeleccionadas.size === 1 && hKey === Array.from(hijuelasSeleccionadas)[0] && puntosActuales.length > 0) ? puntosActuales : hijuela.puntos;
-                const colorLinea = coloresPaleta[colorIndex % coloresPaleta.length];
-                colorIndex++;
+                
+                // ASIGNACIÓN DE COLOR SEGÚN REGLAS RIGUROSAS
+                let colorLinea = '#a855f7'; // Morado (Otros por defecto)
+                const tipoHijuela = (hijuela.tipo || '').trim().toLowerCase();
+                
+                if (tipoHijuela.includes('regular')) {
+                    colorLinea = '#ef4444'; // Rojo (#ef4444)
+                } else if (tipoHijuela.includes('demanda')) {
+                    colorLinea = '#3b82f6'; // Azul (#3b82f6)
+                } else if (tipoHijuela.includes('conjunta')) {
+                    colorLinea = '#10b981'; // Verde (#10b981)
+                }
 
                 puntos.forEach((pt, idx) => {
                     let colorMarker = colorLinea;
-                    if (idx === 0) colorMarker = 'var(--accent-color)'; 
-                    if (idx === puntos.length - 1 && puntos.length > 1) colorMarker = 'var(--danger-color)'; 
+                    if (idx === 0) colorMarker = '#f59e0b'; // Naranja para el origen
+                    if (idx === puntos.length - 1 && puntos.length > 1) colorMarker = '#1e293b'; // Oscuro para el destino
 
                     const icon = L.divIcon({
                         className: 'custom-stop',
@@ -753,7 +822,7 @@
             }
         }
 
-        // ACCIONES DE GUARDADO Y EDICIÓN FIREBASE
+        // ACCIONES FIREBASE
         function guardarTrazadoHijuela() {
             if (!lineaActivaId || hijuelasSeleccionadas.size !== 1) return;
             const hKey = Array.from(hijuelasSeleccionadas)[0];
@@ -838,12 +907,11 @@
         function guardarNuevaHijuela() {
             if(!lineaActivaId) return;
             const nombre = document.getElementById('input-hijuela-nombre').value.trim();
-            const tipo = document.getElementById('input-hijuela-tipo').value.trim();
+            const tipo = document.getElementById('input-hijuela-tipo').value;
             if(!nombre) { alert("El nombre de la hijuela es obligatorio."); return; }
             db.ref(`${DB_NODE}/${lineaActivaId}/hijuelas`).push({ nombre: nombre, tipo: tipo, puntos: [], distanciaKm: "0.0" }).then(snap => {
                 cerrarModal('modal-hijuela');
                 document.getElementById('input-hijuela-nombre').value = '';
-                document.getElementById('input-hijuela-tipo').value = '';
                 
                 hijuelasSeleccionadas.clear();
                 hijuelasSeleccionadas.add(snap.key);
@@ -862,14 +930,14 @@
             hijuelaActivaId = hKey;
             const hijuela = datosFirebase[lineaActivaId].hijuelas[hKey];
             document.getElementById('edit-hijuela-nombre').value = hijuela.nombre || '';
-            document.getElementById('edit-hijuela-tipo').value = hijuela.tipo || '';
+            document.getElementById('edit-hijuela-tipo').value = hijuela.tipo || 'Regular';
             document.getElementById('modal-editar-hijuela').classList.add('open');
         }
 
         function actualizarHijuelaActual() {
             if (!lineaActivaId || !hijuelaActivaId) return;
             const nombre = document.getElementById('edit-hijuela-nombre').value.trim();
-            const tipo = document.getElementById('edit-hijuela-tipo').value.trim();
+            const tipo = document.getElementById('edit-hijuela-tipo').value;
             if (!nombre) { alert("El nombre de la hijuela es obligatorio."); return; }
 
             db.ref(`${DB_NODE}/${lineaActivaId}/hijuelas/${hijuelaActivaId}`).update({
@@ -895,7 +963,7 @@
             }
         }
 
-        // GENERACIÓN DE INFORME TÉCNICO PROFESIONAL
+        // GENERACIÓN DE INFORME TÉCNICO
         function imprimirInformeLinea() {
             if (!lineaActivaId || !datosFirebase[lineaActivaId]) return;
             const linea = datosFirebase[lineaActivaId];
